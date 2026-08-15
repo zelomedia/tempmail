@@ -1,0 +1,950 @@
+﻿<!DOCTYPE html>
+<html lang="de" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TempMail Pro - Material Design</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Roboto', 'sans-serif'],
+                    },
+                    colors: {
+                        // Material Design 3 Light Theme Colors
+                        md: {
+                            sys: {
+                                light: {
+                                    primary: '#0b57d0',
+                                    onPrimary: '#ffffff',
+                                    primaryContainer: '#d3e3fd',
+                                    onPrimaryContainer: '#041e49',
+                                    secondaryContainer: '#c2e7ff',
+                                    onSecondaryContainer: '#001d35',
+                                    surface: '#f8fafd',
+                                    surfaceContainer: '#ebf1f8',
+                                    surfaceContainerHigh: '#e3e9f0',
+                                    onSurface: '#1f1f1f',
+                                    onSurfaceVariant: '#444746',
+                                    outline: '#747775'
+                                },
+                                dark: {
+                                    primary: '#a8c7fa',
+                                    onPrimary: '#062e6f',
+                                    primaryContainer: '#0842a0',
+                                    onPrimaryContainer: '#d3e3fd',
+                                    secondaryContainer: '#004a77',
+                                    onSecondaryContainer: '#c2e7ff',
+                                    surface: '#111114',
+                                    surfaceContainer: '#1e1f22',
+                                    surfaceContainerHigh: '#2b2d31',
+                                    onSurface: '#e3e3e3',
+                                    onSurfaceVariant: '#c4c7c5',
+                                    outline: '#8e918f'
+                                }
+                            }
+                        }
+                    },
+                    borderRadius: {
+                        '3xl': '24px',
+                        '4xl': '28px',
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Google Fonts: Roboto & Material Symbols Rounded -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,1,0" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Roboto', sans-serif; }
+        
+        /* Material Icon Font adjustments */
+        .material-symbols-rounded {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            font-size: 20px;
+        }
+        .icon-unfilled {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+
+        /* Custom Scrollbar for MD3 feel */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { 
+            background-color: rgba(116, 119, 117, 0.3); 
+            border-radius: 10px; 
+        }
+        .dark ::-webkit-scrollbar-thumb { background-color: rgba(142, 145, 143, 0.3); }
+
+        /* Animation utilities */
+        .fade-in { animation: fadeIn 0.2s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="h-full bg-md-sys-light-surface text-md-sys-light-onSurface dark:bg-md-sys-dark-surface dark:text-md-sys-dark-onSurface transition-colors duration-300 flex flex-col">
+
+    <!-- Top App Bar (MD3) -->
+    <header class="h-16 flex items-center justify-between px-4 sm:px-6 sticky top-0 z-30 bg-md-sys-light-surface/90 dark:bg-md-sys-dark-surface/90 backdrop-blur-md">
+        <div class="flex items-center gap-3">
+            <span class="material-symbols-rounded text-md-sys-light-primary dark:text-md-sys-dark-primary text-3xl">mail</span>
+            <h1 class="text-xl font-medium tracking-tight">TempMail</h1>
+        </div>
+        
+        <div class="flex items-center gap-2">
+            <!-- Audio Toggle -->
+            <button id="audioToggleBtn" onclick="toggleAudio()" class="w-10 h-10 rounded-full flex items-center justify-center hover:bg-md-sys-light-surfaceContainerHigh dark:hover:bg-md-sys-dark-surfaceContainerHigh transition-colors text-md-sys-light-onSurfaceVariant dark:text-md-sys-dark-onSurfaceVariant" title="Benachrichtigungston umschalten">
+                <span id="audioIcon" class="material-symbols-rounded icon-unfilled">notifications_off</span>
+            </button>
+            
+            <!-- History Button -->
+            <button onclick="openHistoryModal()" class="w-10 h-10 rounded-full flex items-center justify-center hover:bg-md-sys-light-surfaceContainerHigh dark:hover:bg-md-sys-dark-surfaceContainerHigh transition-colors text-md-sys-light-onSurfaceVariant dark:text-md-sys-dark-onSurfaceVariant" title="Kontenverlauf">
+                <span class="material-symbols-rounded icon-unfilled">history</span>
+            </button>
+
+            <!-- Theme Toggle -->
+            <button onclick="toggleTheme()" class="w-10 h-10 rounded-full flex items-center justify-center hover:bg-md-sys-light-surfaceContainerHigh dark:hover:bg-md-sys-dark-surfaceContainerHigh transition-colors text-md-sys-light-onSurfaceVariant dark:text-md-sys-dark-onSurfaceVariant" title="Design umschalten">
+                <span class="material-symbols-rounded icon-unfilled block dark:hidden">dark_mode</span>
+                <span class="material-symbols-rounded block hidden dark:block text-md-sys-dark-primary">light_mode</span>
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-4 flex flex-col gap-4">
+
+        <!-- Hero Card (Email Details) - MD3 Surface Container -->
+        <section class="bg-md-sys-light-surfaceContainer dark:bg-md-sys-dark-surfaceContainer rounded-[28px] p-6 sm:p-8 flex flex-col md:flex-row items-center justify-between gap-6 transition-colors">
+            
+            <div class="flex-1 w-full text-center md:text-left space-y-2">
+                <p class="text-sm font-medium text-md-sys-light-onSurfaceVariant dark:text-md-sys-dark-onSurfaceVariant uppercase tracking-widest">Deine temporäre Adresse</p>
+                <div class="flex flex-col md:flex-row md:items-center gap-4">
+                    <!-- Current Email Display -->
+                    <h2 id="emailDisplay" class="text-2xl sm:text-4xl font-normal tracking-tight text-md-sys-light-onSurface dark:text-md-sys-dark-onSurface break-all select-all">
+                        lade...
+                    </h2>
+                    
+                    <!-- Copy Button (Primary Action) -->
+                    <button onclick="copyEmail()" class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-md-sys-light-primary hover:bg-[#0842a0] dark:bg-md-sys-dark-primary dark:hover:bg-[#d3e3fd] text-md-sys-light-onPrimary dark:text-md-sys-dark-onPrimary text-sm font-medium transition-colors mx-auto md:mx-0 shrink-0 shadow-sm">
+                        <span class="material-symbols-rounded text-[18px]">content_copy</span>
+                        Adresse kopieren
+                    </button>
+                </div>
+            </div>
+
+            <!-- Secondary Actions -->
+            <div class="flex items-center gap-3 w-full md:w-auto justify-center md:justify-end flex-wrap">
+                <!-- QR Code Btn -->
+                <button onclick="openQRModal()" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-md-sys-light-secondaryContainer hover:bg-[#a8c7fa] dark:bg-md-sys-dark-secondaryContainer dark:hover:bg-[#003659] text-md-sys-light-onSecondaryContainer dark:text-md-sys-dark-onSecondaryContainer text-sm font-medium transition-colors">
+                    <span class="material-symbols-rounded icon-unfilled text-[18px]">qr_code_2</span>
+                    QR Code
+                </button>
+                
+                <!-- Custom Mail Btn -->
+                <button onclick="openCustomModal()" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-md-sys-light-outline dark:border-md-sys-dark-outline hover:bg-md-sys-light-surfaceContainerHigh dark:hover:bg-md-sys-dark-surfaceContainerHigh text-md-sys-light-onSurface dark:text-md-sys-dark-onSurface text-sm font-medium transition-colors">
+                    <span class="material-symbols-rounded icon-unfilled text-[18px]">edit</span>
+                    Eigene
+                </button>
+
+                <!-- Generate New Btn -->
+                <button onclick="generateNewEmail()" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-md-sys-light-outline dark:border-md-sys-dark-outline hover:bg-md-sys-light-surfaceContainerHigh dark:hover:bg-md-sys-dark-surfaceContainerHigh text-md-sys-light-onSurface dark:text-md-sys-dark-onSurface text-sm font-medium transition-colors">
+                    <span class="material-symbols-rounded text-[18px]">refresh</span>
+                    Neu
+                </button>
+            </div>
+        </section>
+
+        <!-- Split View: Inbox List & Message Detail -->
+        <section class="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1 min-h-[500px]">
+            
+            <!-- Left Pane: Inbox -->
+            <div class="lg:col-span-4 flex flex-col bg-md-sys-light-surfaceContainer dark:bg-md-sys-dark-surfaceContainer rounded-[24px] overflow-hidden">
+                
+                <div class="px-5 py-4 flex items-center justify-between border-b border-md-sys-light-surfaceContainerHigh dark:border-md-sys-dark-surfaceContainerHigh">
+                    <div class="flex items-center gap-2">
+                        <span class="font-medium text-md-sys-light-onSurface dark:text-md-sys-dark-onSurface">Posteingang</span>
+                        <span id="msgCountBadge" class="bg-md-sys-light-primaryContainer dark:bg-md-sys-dark-primaryContainer text-md-sys-light-onPrimaryContainer dark:text-md-sys-dark-onPrimaryContainer text-xs font-medium px-2 py-0.5 rounded-full">0</span>
+                    </div>
+                    
+                    <div class="flex gap-1">
+                        <button onclick="fetchMessages()" class="w-8 h-8 rounded-full flex items-center justify-center hover:bg-md-sys-light-surfaceContainerHigh dark:hover:bg-md-sys-dark-surfaceContainerHigh text-md-sys-light-onSurfaceVariant dark:text-md-sys-dark-onSurfaceVariant transition">
+                            <span class="material-symbols-rounded text-[20px]">sync</span>
+                        </button>
+                        <button onclick="deleteAllMessages()" class="w-8 h-8 rounded-full flex items-center justify-center hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 transition" title="Alle löschen">
+                            <span class="material-symbols-rounded text-[20px] icon-unfilled">delete</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="messagesList" class="flex-1 overflow-y-auto p-2 space-y-1">
+                    <!-- Messages will be injected here -->
+                    <div class="flex flex-col items-center justify-center h-full p-6 text-center opacity-70">
+                        <span class="material-symbols-rounded text-4xl mb-2 icon-unfilled text-md-sys-light-onSurfaceVariant dark:text-md-sys-dark-onSurfaceVariant">inbox</span>
+                        <p class="text-sm">Keine Nachrichten</p>
+                    </div>
+                </div>
+
+                <!-- Timer / Auto-sync status -->
+                <div class="px-5 py-3 bg-md-sys-light-surfaceContainerHigh dark:bg-md-sys-dark-surfaceContainerHigh text-xs flex justify-between items-center text-md-sys-light-onSurfaceVariant dark:text-md-sys-dark-onSurfaceVariant">
+                    <div class="flex items-center gap-2">
+                        <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                        <span>Live Sync</span>
+                    </div>
+                    <span id="countdownTimer">10s</span>
+                </div>
+            </div>
+
+            <!-- Right Pane: Message Detail -->
+            <div class="lg:col-span-8 flex flex-col bg-md-sys-light-surfaceContainer dark:bg-md-sys-dark-surfaceContainer rounded-[24px] overflow-hidden min-h-[400px]">
+                <div id="messageDetail" class="flex-1 flex flex-col h-full bg-white dark:bg-[#1a1c1e] rounded-[24px] m-1 overflow-hidden relative">
+                    
+                    <!-- Empty State -->
+                    <div class="flex flex-col items-center justify-center h-full p-8 text-center text-md-sys-light-onSurfaceVariant dark:text-md-sys-dark-onSurfaceVariant">
+                        <span class="material-symbols-rounded text-6xl mb-4 icon-unfilled opacity-50">mail</span>
+                        <h3 class="text-lg font-medium mb-1 text-md-sys-light-onSurface dark:text-md-sys-dark-onSurface">Keine E-Mail ausgewählt</h3>
+                        <p class="text-sm">Wähle eine Nachricht aus der Liste, um sie hier zu lesen.</p>
+                    </div>
+
+                </div>
+            </div>
+
+        </section>
+    </main>
+
+    <!-- QR Code Modal -->
+    <div id="qrModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-md-sys-light-surfaceContainer dark:bg-md-sys-dark-surfaceContainer rounded-[28px] max-w-sm w-full p-8 shadow-2xl transform scale-95 transition-transform duration-300 relative">
+            <h3 class="text-xl font-medium mb-6 text-center text-md-sys-light-onSurface dark:text-md-sys-dark-onSurface">QR Code scannen</h3>
+            
+            <div class="bg-white p-4 rounded-2xl mx-auto w-fit mb-6 shadow-sm">
+                <!-- Using an image tag pointing to a free QR generation API -->
+                <img id="qrImage" src="" alt="QR Code" class="w-48 h-48 object-contain">
+            </div>
+            
+            <p class="text-center text-sm font-medium mb-8 text-md-sys-light-onSurfaceVariant dark:text-md-sys-dark-onSurfaceVariant break-all" id="qrEmailText"></p>
+            
+            <button onclick="closeModal('qrModal')" class="w-full py-3 rounded-full bg-md-sys-light-primaryContainer dark:bg-md-sys-dark-primaryContainer text-md-sys-light-onPrimaryContainer dark:text-md-sys-dark-onPrimaryContainer font-medium transition-colors hover:opacity-90">
+                Schließen
+            </button>
+        </div>
+    </div>
+
+    <!-- Custom Address Modal -->
+    <div id="customModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-md-sys-light-surfaceContainer dark:bg-md-sys-dark-surfaceContainer rounded-[28px] max-w-md w-full p-8 shadow-2xl transform scale-95 transition-transform duration-300">
+            <h3 class="text-xl font-medium mb-2 text-md-sys-light-onSurface dark:text-md-sys-dark-onSurface">Wunschadresse erstellen</h3>
+            <p class="text-sm text-md-sys-light-onSurfaceVariant dark:text-md-sys-dark-onSurfaceVariant mb-6">Erstelle eine personalisierte Adresse für deinen Bedarf.</p>
+
+            <form onsubmit="handleCustomEmailSubmit(event)" class="space-y-5">
+                <div class="flex flex-col gap-1.5">
+                    <label class="text-xs font-medium pl-2 text-md-sys-light-onSurfaceVariant dark:text-md-sys-dark-onSurfaceVariant">Nutzername</label>
+                    <input type="text" id="customUsername" required pattern="[a-zA-Z0-9._-]+" placeholder="z.b. max.mustermann" class="w-full bg-white dark:bg-[#1a1c1e] border-none rounded-full px-5 py-3.5 text-sm focus:ring-2 focus:ring-md-sys-light-primary dark:focus:ring-md-sys-dark-primary text-md-sys-light-onSurface dark:text-md-sys-dark-onSurface placeholder-gray-400">
+                </div>
+
+                <div class="flex flex-col gap-1.5">
+                    <label class="text-xs font-medium pl-2 text-md-sys-light-onSurfaceVariant dark:text-md-sys-dark-onSurfaceVariant">Domain</label>
+                    <select id="customDomainSelect" class="w-full bg-white dark:bg-[#1a1c1e] border-none rounded-full px-5 py-3.5 text-sm focus:ring-2 focus:ring-md-sys-light-primary dark:focus:ring-md-sys-dark-primary text-md-sys-light-onSurface dark:text-md-sys-dark-onSurface appearance-none">
+                        <option value="">Lade Domains...</option>
+                    </select>
+                </div>
+
+                <div class="pt-4 flex justify-end gap-3">
+                    <button type="button" onclick="closeModal('customModal')" class="px-6 py-2.5 rounded-full text-md-sys-light-onSurfaceVariant dark:text-md-sys-dark-onSurfaceVariant font-medium hover:bg-black/5 dark:hover:bg-white/5 transition-colors">Abbrechen</button>
+                    <button type="submit" class="px-6 py-2.5 rounded-full bg-md-sys-light-primary dark:bg-md-sys-dark-primary text-md-sys-light-onPrimary dark:text-md-sys-dark-onPrimary font-medium transition-colors hover:shadow-md">Erstellen</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- History Modal -->
+    <div id="historyModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-md-sys-light-surfaceContainer dark:bg-md-sys-dark-surfaceContainer rounded-[28px] max-w-lg w-full shadow-2xl transform scale-95 transition-transform duration-300 flex flex-col max-h-[80vh]">
+            <div class="p-6 pb-4 border-b border-md-sys-light-outline/20 dark:border-md-sys-dark-outline/20 flex items-center justify-between">
+                <div>
+                    <h3 class="text-xl font-medium text-md-sys-light-onSurface dark:text-md-sys-dark-onSurface">Kontenverlauf</h3>
+                    <p class="text-xs text-md-sys-light-onSurfaceVariant dark:text-md-sys-dark-onSurfaceVariant mt-1">Wechsle zu zuvor generierten Adressen (Token lokal gespeichert).</p>
+                </div>
+                <button onclick="closeModal('historyModal')" class="w-10 h-10 rounded-full flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/5 text-md-sys-light-onSurfaceVariant dark:text-md-sys-dark-onSurfaceVariant">
+                    <span class="material-symbols-rounded icon-unfilled">close</span>
+                </button>
+            </div>
+            
+            <div id="historyList" class="p-4 overflow-y-auto flex-1 space-y-2">
+                <!-- History items injected here -->
+            </div>
+            
+            <div class="p-4 border-t border-md-sys-light-outline/20 dark:border-md-sys-dark-outline/20">
+                <button onclick="clearHistory()" class="w-full py-2.5 rounded-full text-red-600 dark:text-red-400 font-medium hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-sm">
+                    Verlauf leeren
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50 flex flex-col gap-2 pointer-events-none items-center"></div>
+
+    <!-- JavaScript Application Logic -->
+    <script>
+        const API_BASE = 'https://api.mail.tm';
+        
+        // Application State
+        let state = {
+            token: localStorage.getItem('mailtm_token') || null,
+            address: localStorage.getItem('mailtm_address') || null,
+            id: localStorage.getItem('mailtm_id') || null,
+            password: localStorage.getItem('mailtm_password') || null,
+            isMockMode: localStorage.getItem('mailtm_mock_mode') === 'true',
+            domains: [],
+            messages: JSON.parse(localStorage.getItem('mailtm_mock_messages') || '[]'),
+            currentMessageId: null,
+            countdown: 10,
+            soundEnabled: localStorage.getItem('mailtm_sound') === 'true',
+            history: JSON.parse(localStorage.getItem('mailtm_history') || '[]')
+        };
+
+        // Theme Management (Material 3 Toggle)
+        function applyTheme() {
+            if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        }
+        applyTheme();
+
+        function toggleTheme() {
+            if (document.documentElement.classList.contains('dark')) {
+                document.documentElement.classList.remove('dark');
+                localStorage.theme = 'light';
+            } else {
+                document.documentElement.classList.add('dark');
+                localStorage.theme = 'dark';
+            }
+        }
+
+        // --- NEW FEATURE: Audio Notification via Web Audio API ---
+        function toggleAudio() {
+            state.soundEnabled = !state.soundEnabled;
+            localStorage.setItem('mailtm_sound', state.soundEnabled);
+            updateAudioIcon();
+            if (state.soundEnabled) {
+                playNotificationSound(); // Play test sound when enabled
+                showToast('Benachrichtigungston aktiviert');
+            } else {
+                showToast('Benachrichtigungston deaktiviert');
+            }
+        }
+
+        function updateAudioIcon() {
+            const icon = document.getElementById('audioIcon');
+            if (state.soundEnabled) {
+                icon.textContent = 'notifications_active';
+                icon.classList.remove('icon-unfilled');
+                icon.classList.add('text-md-sys-light-primary', 'dark:text-md-sys-dark-primary');
+            } else {
+                icon.textContent = 'notifications_off';
+                icon.classList.add('icon-unfilled');
+                icon.classList.remove('text-md-sys-light-primary', 'dark:text-md-sys-dark-primary');
+            }
+        }
+
+        function playNotificationSound() {
+            if (!state.soundEnabled) return;
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                
+                osc.type = 'sine';
+                // Material-like gentle double beep
+                osc.frequency.setValueAtTime(600, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.1);
+                
+                gain.gain.setValueAtTime(0, ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.1, ctx.currentTime + 0.05);
+                gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.3);
+                
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 0.4);
+            } catch (e) {
+                console.log("Audio not supported or blocked");
+            }
+        }
+
+        // Material 3 Snackbar/Toast
+        function showToast(message) {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            // MD3 Snackbar styling
+            toast.className = `pointer-events-auto flex items-center gap-3 px-4 py-3 min-w-[300px] rounded-[4px] bg-[#313033] dark:bg-[#e6e1e5] text-[#f4eff4] dark:text-[#313033] shadow-md text-sm font-medium transition-all transform translate-y-4 opacity-0 duration-300`;
+            
+            toast.innerHTML = `<span>${message}</span>`;
+            container.appendChild(toast);
+
+            // Animate in
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-y-4', 'opacity-0');
+            });
+
+            // Animate out
+            setTimeout(() => {
+                toast.classList.add('translate-y-4', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+
+        function copyEmail() {
+            if (!state.address) return;
+            navigator.clipboard.writeText(state.address).then(() => {
+                showToast('E-Mail-Adresse in Zwischenablage kopiert');
+            }).catch(() => {
+                // Fallback
+                const ta = document.createElement('textarea');
+                ta.value = state.address;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                showToast('E-Mail-Adresse kopiert');
+            });
+        }
+
+        // Modal Management
+        function openModal(id) {
+            const modal = document.getElementById(id);
+            modal.classList.remove('hidden');
+            // Trigger reflow for animation
+            void modal.offsetWidth;
+            modal.classList.remove('opacity-0');
+            modal.querySelector('div').classList.remove('scale-95');
+        }
+
+        function closeModal(id) {
+            const modal = document.getElementById(id);
+            modal.classList.add('opacity-0');
+            modal.querySelector('div').classList.add('scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300);
+        }
+
+        function openCustomModal() {
+            openModal('customModal');
+            if (state.domains.length === 0) fetchDomains();
+        }
+
+        function openQRModal() {
+            if (!state.address) return;
+            document.getElementById('qrEmailText').textContent = state.address;
+            document.getElementById('qrImage').src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=10&data=${encodeURIComponent(state.address)}`;
+            openModal('qrModal');
+        }
+
+        // --- NEW FEATURE: Account History ---
+        function saveToHistory() {
+            if (!state.address || !state.token) return;
+            // Check if already in history
+            const exists = state.history.find(h => h.address === state.address);
+            if (!exists) {
+                state.history.unshift({
+                    address: state.address,
+                    token: state.token,
+                    id: state.id,
+                    password: state.password,
+                    date: new Date().toISOString()
+                });
+                // Keep only last 10
+                if (state.history.length > 10) state.history.pop();
+                localStorage.setItem('mailtm_history', JSON.stringify(state.history));
+            }
+        }
+
+        function openHistoryModal() {
+            renderHistoryList();
+            openModal('historyModal');
+        }
+
+        function renderHistoryList() {
+            const listEl = document.getElementById('historyList');
+            if (state.history.length === 0) {
+                listEl.innerHTML = `<p class="text-sm text-center text-gray-500 py-4">Kein Verlauf vorhanden.</p>`;
+                return;
+            }
+
+            listEl.innerHTML = state.history.map(item => {
+                const isActive = item.address === state.address;
+                const dateStr = new Date(item.date).toLocaleDateString() + ' ' + new Date(item.date).toLocaleTimeString([],{hour:'2-digit', minute:'2-digit'});
+                
+                return `
+                    <div class="flex items-center justify-between p-3 rounded-2xl border ${isActive ? 'bg-md-sys-light-secondaryContainer dark:bg-md-sys-dark-secondaryContainer border-transparent' : 'border-md-sys-light-outline/20 dark:border-md-sys-dark-outline/20 bg-white dark:bg-[#1a1c1e]'}">
+                        <div class="overflow-hidden pr-2">
+                            <p class="font-medium text-sm truncate text-md-sys-light-onSurface dark:text-md-sys-dark-onSurface">${item.address}</p>
+                            <p class="text-xs text-md-sys-light-onSurfaceVariant dark:text-md-sys-dark-onSurfaceVariant truncate">${dateStr}</p>
+                        </div>
+                        ${!isActive ? `
+                            <button onclick="switchToHistoryAccount('${item.address}')" class="shrink-0 px-4 py-1.5 rounded-full bg-md-sys-light-primary text-md-sys-light-onPrimary dark:bg-md-sys-dark-primary dark:text-md-sys-dark-onPrimary text-xs font-medium hover:opacity-90">
+                                Wechseln
+                            </button>
+                        ` : `
+                            <span class="shrink-0 px-3 py-1 rounded-full bg-black/5 dark:bg-white/10 text-xs font-medium">Aktiv</span>
+                        `}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function switchToHistoryAccount(address) {
+            const account = state.history.find(h => h.address === address);
+            if (account) {
+                state.address = account.address;
+                state.token = account.token;
+                state.id = account.id;
+                state.password = account.password;
+                
+                localStorage.setItem('mailtm_token', state.token);
+                localStorage.setItem('mailtm_address', state.address);
+                localStorage.setItem('mailtm_id', state.id);
+                localStorage.setItem('mailtm_password', state.password);
+                
+                updateUI();
+                state.messages = []; // Clear current UI messages
+                fetchMessages();
+                closeModal('historyModal');
+                showToast(`Zu ${address} gewechselt`);
+            }
+        }
+
+        function clearHistory() {
+            state.history = [];
+            localStorage.removeItem('mailtm_history');
+            // Re-save current active account
+            saveToHistory();
+            renderHistoryList();
+            showToast('Verlauf geleert');
+        }
+
+
+        async function fetchDomains() {
+            try {
+                const res = await fetch(`${API_BASE}/domains`);
+                if (!res.ok) throw new Error();
+                const data = await res.json();
+                state.domains = data['hydra:member'] || [];
+                state.isMockMode = false;
+                localStorage.setItem('mailtm_mock_mode', 'false');
+            } catch (err) {
+                state.isMockMode = true;
+                localStorage.setItem('mailtm_mock_mode', 'true');
+                // Mock Domains
+                state.domains = [{ domain: 'mail.tm' }, { domain: 'demo.com' }];
+            } finally {
+                const select = document.getElementById('customDomainSelect');
+                if (select) {
+                    select.innerHTML = state.domains.map(d => `<option value="${d.domain}">${d.domain}</option>`).join('');
+                }
+            }
+        }
+
+        async function createAndAuthenticateAccount(address, password) {
+            if (state.isMockMode) {
+                state.token = 'mock_token_' + Date.now();
+                state.address = address;
+                state.id = 'mock_id_' + Date.now();
+                state.password = password;
+                finalizeAccountSetup();
+                return;
+            }
+
+            const createRes = await fetch(`${API_BASE}/accounts`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ address, password })
+            });
+
+            if (!createRes.ok) {
+                const errData = await createRes.json().catch(() => ({}));
+                throw new Error(errData.detail || 'Erstellung fehlgeschlagen');
+            }
+
+            const tokenRes = await fetch(`${API_BASE}/token`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ address, password })
+            });
+
+            if (!tokenRes.ok) throw new Error('Auth fehlgeschlagen');
+            const tokenData = await tokenRes.json();
+
+            state.token = tokenData.token;
+            state.address = address;
+            state.id = tokenData.id;
+            state.password = password;
+
+            finalizeAccountSetup();
+        }
+
+        function finalizeAccountSetup() {
+            localStorage.setItem('mailtm_token', state.token);
+            localStorage.setItem('mailtm_address', state.address);
+            localStorage.setItem('mailtm_id', state.id);
+            localStorage.setItem('mailtm_password', state.password);
+            
+            saveToHistory();
+            updateUI();
+            
+            state.messages = [];
+            document.getElementById('messageDetail').innerHTML = getEmptyDetailHTML();
+            
+            fetchMessages();
+        }
+
+        async function generateNewEmail() {
+            try {
+                if (state.domains.length === 0) await fetchDomains();
+                const domain = state.domains[Math.floor(Math.random() * state.domains.length)].domain;
+                const randomStr = Math.random().toString(36).substring(2, 10);
+                const address = `user.${randomStr}@${domain}`;
+                const password = Math.random().toString(36).slice(-10) + 'A1!';
+
+                await createAndAuthenticateAccount(address, password);
+                showToast('Neue Adresse bereit');
+                
+                if (state.isMockMode) addMockWelcomeMessage();
+            } catch (err) {
+                console.error(err);
+                // Force mock
+                state.isMockMode = true;
+                localStorage.setItem('mailtm_mock_mode', 'true');
+                generateNewEmail();
+            }
+        }
+
+        async function handleCustomEmailSubmit(e) {
+            e.preventDefault();
+            const username = document.getElementById('customUsername').value.trim();
+            const domain = document.getElementById('customDomainSelect').value;
+            const address = `${username}@${domain}`;
+            const password = Math.random().toString(36).slice(-10) + 'A1!';
+
+            try {
+                await createAndAuthenticateAccount(address, password);
+                closeModal('customModal');
+                showToast('Wunschadresse eingerichtet');
+            } catch (err) {
+                showToast(err.message || 'Fehler: Name eventuell vergeben');
+            }
+        }
+
+        function addMockWelcomeMessage() {
+            const welcomeMsg = {
+                id: 'mock_msg_' + Date.now(),
+                from: { name: 'Material Pro Team', address: 'hello@material.test' },
+                subject: 'Willkommen beim neuen Material Design! ✨',
+                intro: 'Erlebe das neue Google MD3 Design in deiner App...',
+                text: 'Deine neue Adresse ist startklar!\n\nNutze sie überall dort, wo du deine echte E-Mail-Adresse nicht angeben möchtest.',
+                html: '<div style="font-family: Roboto, sans-serif; padding: 20px;"><h2 style="color: #0b57d0;">Hallo!</h2><p>Die App unterstützt nun Material Design 3, Töne, E-Mail-Downloads und Verlauf.</p></div>',
+                createdAt: new Date().toISOString(),
+                seen: false
+            };
+            state.messages = [welcomeMsg];
+            localStorage.setItem('mailtm_mock_messages', JSON.stringify(state.messages));
+            renderMessagesList();
+            playNotificationSound();
+        }
+
+        async function fetchMessages() {
+            if (!state.token) return;
+            
+            const previousCount = state.messages.length;
+
+            if (state.isMockMode) {
+                renderMessagesList();
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_BASE}/messages`, {
+                    headers: { 'Authorization': `Bearer ${state.token}` }
+                });
+
+                if (res.status === 401) {
+                    generateNewEmail();
+                    return;
+                }
+
+                if (!res.ok) throw new Error();
+                const data = await res.json();
+                state.messages = data['hydra:member'] || [];
+                
+                // Play sound if new messages arrived
+                if (state.messages.length > previousCount) {
+                    playNotificationSound();
+                }
+
+                renderMessagesList();
+            } catch (err) {
+                state.isMockMode = true;
+                localStorage.setItem('mailtm_mock_mode', 'true');
+                renderMessagesList();
+            }
+        }
+
+        function renderMessagesList() {
+            const listEl = document.getElementById('messagesList');
+            document.getElementById('msgCountBadge').textContent = state.messages.length;
+
+            if (state.messages.length === 0) {
+                listEl.innerHTML = `
+                    <div class="flex flex-col items-center justify-center h-full p-6 text-center opacity-70 mt-10">
+                        <span class="material-symbols-rounded text-5xl mb-2 icon-unfilled text-md-sys-light-onSurfaceVariant dark:text-md-sys-dark-onSurfaceVariant">inbox</span>
+                        <p class="text-sm text-md-sys-light-onSurfaceVariant dark:text-md-sys-dark-onSurfaceVariant">Posteingang leer</p>
+                    </div>
+                `;
+                return;
+            }
+
+            listEl.innerHTML = state.messages.map(msg => {
+                const date = new Date(msg.createdAt);
+                const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const isSelected = msg.id === state.currentMessageId;
+                const unreadClass = !msg.seen ? 'font-bold text-md-sys-light-onSurface dark:text-md-sys-dark-onSurface' : 'font-normal text-md-sys-light-onSurfaceVariant dark:text-md-sys-dark-onSurfaceVariant';
+                
+                // MD3 List Item Style
+                return `
+                    <div onclick="openMessage('${msg.id}')" class="group cursor-pointer rounded-[16px] p-4 transition-all duration-200 ${isSelected ? 'bg-md-sys-light-secondaryContainer dark:bg-md-sys-dark-secondaryContainer' : 'hover:bg-black/5 dark:hover:bg-white/5 bg-transparent'}">
+                        <div class="flex items-start gap-3">
+                            <!-- Avatar Placeholder -->
+                            <div class="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center text-white text-lg font-medium ${!msg.seen ? 'bg-md-sys-light-primary dark:bg-md-sys-dark-primary' : 'bg-gray-400 dark:bg-gray-700'}">
+                                ${(msg.from.name || msg.from.address).charAt(0).toUpperCase()}
+                            </div>
+                            
+                            <div class="flex-1 min-w-0">
+                                <div class="flex justify-between items-baseline mb-0.5">
+                                    <h4 class="text-sm truncate pr-2 ${!msg.seen ? 'font-bold text-md-sys-light-onSurface dark:text-md-sys-dark-onSurface' : 'font-medium text-md-sys-light-onSurface dark:text-md-sys-dark-onSurface'}">
+                                        ${msg.from.name || msg.from.address}
+                                    </h4>
+                                    <span class="text-[11px] whitespace-nowrap ${!msg.seen ? 'font-bold text-md-sys-light-primary dark:text-md-sys-dark-primary' : 'text-md-sys-light-onSurfaceVariant dark:text-md-sys-dark-onSurfaceVariant'}">${timeStr}</span>
+                                </div>
+                                <h5 class="text-sm truncate mb-0.5 ${unreadClass}">${msg.subject || '(Kein Betreff)'}</h5>
+                                <p class="text-sm truncate text-md-sys-light-onSurfaceVariant dark:text-md-sys-dark-onSurfaceVariant">${msg.intro || '...'}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function openMessage(id) {
+            state.currentMessageId = id;
+            renderMessagesList();
+
+            const detailEl = document.getElementById('messageDetail');
+            detailEl.innerHTML = `
+                <div class="flex items-center justify-center h-full">
+                    <span class="material-symbols-rounded text-4xl animate-spin text-md-sys-light-primary dark:text-md-sys-dark-primary">sync</span>
+                </div>
+            `;
+
+            try {
+                let msg;
+                if (state.isMockMode) {
+                    msg = state.messages.find(m => m.id === id);
+                } else {
+                    const res = await fetch(`${API_BASE}/messages/${id}`, {
+                        headers: { 'Authorization': `Bearer ${state.token}` }
+                    });
+                    if (!res.ok) throw new Error();
+                    msg = await res.json();
+                }
+
+                if (!msg) throw new Error();
+
+                const fullDate = new Date(msg.createdAt).toLocaleString();
+                
+                // Mark seen
+                const targetMsg = state.messages.find(m => m.id === id);
+                if (targetMsg) targetMsg.seen = true;
+                if (state.isMockMode) localStorage.setItem('mailtm_mock_messages', JSON.stringify(state.messages));
+
+                detailEl.innerHTML = `
+                    <!-- Mail Header -->
+                    <div class="px-6 py-5 border-b border-md-sys-light-outline/10 dark:border-md-sys-dark-outline/10 flex flex-col gap-4">
+                        <div class="flex items-start justify-between gap-4">
+                            <h2 class="text-2xl font-normal text-md-sys-light-onSurface dark:text-md-sys-dark-onSurface">${msg.subject || '(Kein Betreff)'}</h2>
+                            
+                            <!-- Actions -->
+                            <div class="flex items-center gap-1 shrink-0">
+                                <button onclick="downloadEmail('${msg.id}')" title="Als TXT herunterladen" class="w-10 h-10 rounded-full flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/5 text-md-sys-light-onSurfaceVariant dark:text-md-sys-dark-onSurfaceVariant transition">
+                                    <span class="material-symbols-rounded icon-unfilled">download</span>
+                                </button>
+                                <button onclick="deleteMessage('${msg.id}')" title="Löschen" class="w-10 h-10 rounded-full flex items-center justify-center hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 transition">
+                                    <span class="material-symbols-rounded icon-unfilled">delete</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-600 dark:text-blue-300 font-medium text-lg">
+                                ${(msg.from.name || msg.from.address).charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                                <div class="text-sm font-medium text-md-sys-light-onSurface dark:text-md-sys-dark-onSurface">
+                                    ${msg.from.name ? `${msg.from.name} <span class="font-normal opacity-70">&lt;${msg.from.address}&gt;</span>` : msg.from.address}
+                                </div>
+                                <div class="text-xs text-md-sys-light-onSurfaceVariant dark:text-md-sys-dark-onSurfaceVariant">
+                                    An: mich • ${fullDate}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Mail Body -->
+                    <div class="flex-1 overflow-y-auto p-6 bg-white dark:bg-[#1a1c1e]">
+                        ${msg.html ? 
+                            `<iframe class="w-full h-full min-h-[400px] border-none" srcdoc="${escapeHtmlAttr(msg.html)}"></iframe>` :
+                            `<div class="whitespace-pre-wrap font-sans text-sm text-md-sys-light-onSurface dark:text-md-sys-dark-onSurface">${escapeHtml(msg.text || 'Kein Textinhalt.')}</div>`
+                        }
+                    </div>
+                `;
+
+                // Update list to remove bold status
+                renderMessagesList();
+
+            } catch (err) {
+                detailEl.innerHTML = getEmptyDetailHTML("Fehler beim Laden der Nachricht.");
+            }
+        }
+
+        // --- NEW FEATURE: Download Email ---
+        async function downloadEmail(id) {
+            try {
+                let msg;
+                if (state.isMockMode) {
+                    msg = state.messages.find(m => m.id === id);
+                } else {
+                    const res = await fetch(`${API_BASE}/messages/${id}`, { headers: { 'Authorization': `Bearer ${state.token}` } });
+                    msg = await res.json();
+                }
+                
+                if(!msg) return;
+
+                const content = `Von: ${msg.from.address}\nDatum: ${new Date(msg.createdAt).toLocaleString()}\nBetreff: ${msg.subject || 'Kein Betreff'}\n\n${msg.text || 'Kein Klartext verfügbar.'}`;
+                const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Email_${msg.id.substring(0,6)}.txt`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                showToast('E-Mail heruntergeladen');
+            } catch (e) {
+                showToast('Download fehlgeschlagen');
+            }
+        }
+
+        async function deleteMessage(id) {
+            try {
+                if (!state.isMockMode) {
+                    await fetch(`${API_BASE}/messages/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${state.token}` } });
+                }
+                state.messages = state.messages.filter(m => m.id !== id);
+                if (state.isMockMode) localStorage.setItem('mailtm_mock_messages', JSON.stringify(state.messages));
+
+                if (state.currentMessageId === id) {
+                    state.currentMessageId = null;
+                    document.getElementById('messageDetail').innerHTML = getEmptyDetailHTML();
+                }
+                renderMessagesList();
+                showToast('Nachricht gelöscht');
+            } catch (err) {
+                showToast('Löschen fehlgeschlagen');
+            }
+        }
+
+        async function deleteAllMessages() {
+            if (state.messages.length === 0) return;
+            // Quick confirmation prompt using modern browser UI
+            if (!confirm('Gesamten Posteingang wirklich leeren?')) return;
+
+            if (!state.isMockMode) {
+                for (const msg of state.messages) {
+                    await fetch(`${API_BASE}/messages/${msg.id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${state.token}` } }).catch(()=>{});
+                }
+            }
+            
+            state.messages = [];
+            if (state.isMockMode) localStorage.setItem('mailtm_mock_messages', '[]');
+            state.currentMessageId = null;
+            document.getElementById('messageDetail').innerHTML = getEmptyDetailHTML();
+            renderMessagesList();
+            showToast('Posteingang geleert');
+        }
+
+        // Helpers
+        function getEmptyDetailHTML(customText) {
+            return `
+                <div class="flex flex-col items-center justify-center h-full p-8 text-center text-md-sys-light-onSurfaceVariant dark:text-md-sys-dark-onSurfaceVariant">
+                    <span class="material-symbols-rounded text-6xl mb-4 icon-unfilled opacity-50">mail</span>
+                    <h3 class="text-lg font-medium mb-1 text-md-sys-light-onSurface dark:text-md-sys-dark-onSurface">${customText || 'Keine E-Mail ausgewählt'}</h3>
+                    <p class="text-sm">Wähle eine Nachricht aus der Liste, um sie hier zu lesen.</p>
+                </div>
+            `;
+        }
+
+        function updateUI() {
+            const display = document.getElementById('emailDisplay');
+            if (display && state.address) {
+                display.textContent = state.address;
+            }
+            updateAudioIcon();
+        }
+
+        function escapeHtml(text) {
+            const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+            return text.replace(/[&<>"']/g, m => map[m]);
+        }
+
+        function escapeHtmlAttr(text) {
+            return text.replace(/"/g, '&quot;');
+        }
+
+        // Background Timer loop
+        setInterval(() => {
+            state.countdown--;
+            const timerEl = document.getElementById('countdownTimer');
+            if (timerEl) timerEl.textContent = `${state.countdown}s`;
+
+            if (state.countdown <= 0) {
+                state.countdown = 10;
+                fetchMessages();
+            }
+        }, 1000);
+
+        // Boot
+        window.onload = async function() {
+            updateAudioIcon();
+            await fetchDomains();
+            if (state.token && state.address) {
+                updateUI();
+                saveToHistory(); // Ensure current is in history
+                fetchMessages();
+            } else {
+                generateNewEmail();
+            }
+        };
+    </script>
+</body>
+</html>
