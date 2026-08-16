@@ -56,7 +56,6 @@
 </head>
 <body class="h-full bg-m3-surface text-slate-900 dark:bg-m3-darkSurface dark:text-slate-100 transition-colors duration-300 flex flex-col">
 
-    <!-- Top App Bar (dein Original-Design) -->
     <header class="bg-m3-surface dark:bg-m3-darkSurface sticky top-0 z-30 px-4 sm:px-6 h-16 flex items-center justify-between">
         <div class="flex items-center space-x-3">
             <div class="w-10 h-10 rounded-full bg-m3-primaryContainer dark:bg-m3-darkPrimaryContainer flex items-center justify-center text-m3-onPrimaryContainer dark:text-m3-darkPrimary">
@@ -76,10 +75,8 @@
         </div>
     </header>
 
-    <!-- Main -->
     <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-4 flex flex-col gap-6">
 
-        <!-- Hero Card -->
         <section class="bg-m3-surfaceContainer dark:bg-m3-darkSurfaceContainer rounded-[28px] p-6 sm:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative overflow-hidden">
             <div class="flex-1 space-y-3 z-10 w-full">
                 <div class="flex items-center justify-between">
@@ -118,7 +115,6 @@
             <div class="absolute -right-20 -top-20 w-64 h-64 bg-m3-primary/5 dark:bg-m3-darkPrimary/5 rounded-full blur-3xl pointer-events-none"></div>
         </section>
 
-        <!-- Inbox -->
         <section class="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 min-h-[500px]">
             <div class="lg:col-span-5 bg-white dark:bg-m3-darkSurfaceContainer border border-slate-200 dark:border-slate-800 rounded-[28px] flex flex-col overflow-hidden">
                 <div class="p-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
@@ -162,7 +158,6 @@
         </section>
     </main>
 
-    <!-- Modals -->
     <div id="customModal" class="fixed inset-0 bg-slate-900/40 dark:bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden transition-opacity duration-300 opacity-0 pointer-events-none">
         <div class="bg-white dark:bg-m3-darkSurface border border-slate-200 dark:border-slate-800 rounded-[28px] max-w-md w-full p-6 sm:p-8 shadow-2xl transform scale-95 transition-transform duration-300">
             <h3 class="font-medium text-xl mb-2 text-slate-900 dark:text-white">Wunschadresse</h3>
@@ -204,10 +199,9 @@
 
     <script>
         // ============================================================
-        // 1. KONFIGURATION – JETZT MIT EIGENEM PROXY!
+        // 1. KONFIGURATION
         // ============================================================
-        // Der Proxy leitet alle Anfragen an 1secmail weiter und umgeht CORS
-        const PROXY_URL = '/api/proxy';
+        const API_URL = 'https://www.1secmail.com/api/v1/';
 
         // ============================================================
         // 2. STATE
@@ -224,27 +218,81 @@
         };
 
         // ============================================================
-        // 3. API HELPER (ÜBER PROXY)
+        // 3. API HELPER (MIT PUBLIC CORS PROXY FALLBACKS)
         // ============================================================
         async function callApi(action, params = {}) {
-            const url = new URL(PROXY_URL, window.location.origin);
-            url.searchParams.set('action', action);
+            const targetUrl = new URL(API_URL);
+            targetUrl.searchParams.set('action', action);
             for (const [key, value] of Object.entries(params)) {
-                if (value) url.searchParams.set(key, value);
+                if (value) targetUrl.searchParams.set(key, value);
+            }
+            
+            // Zeitstempel anhängen, um aggressives Caching zu vermeiden
+            targetUrl.searchParams.set('_cb', Date.now());
+            const targetStr = targetUrl.toString();
+
+            console.log('[API Target]', targetStr);
+
+            // Verbesserte Fetch-Strategien für maximale Kompatibilität
+            const fetchStrategies = [
+                {
+                    // 1. Direkter Aufruf (oft möglich bei einfachen GET-Anfragen ohne Custom-Headers)
+                    url: targetStr,
+                    process: async (res) => {
+                        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                        return res.json();
+                    }
+                },
+                {
+                    // 2. AllOrigins /get (Sehr zuverlässig, da es striktes CORS umgeht und JSON zurückgibt)
+                    url: `https://api.allorigins.win/get?url=${encodeURIComponent(targetStr)}`,
+                    process: async (res) => {
+                        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                        const data = await res.json();
+                        if (data.contents) {
+                            try { return JSON.parse(data.contents); } 
+                            catch(e) { return data.contents; }
+                        }
+                        throw new Error('Leere Antwort vom Proxy');
+                    }
+                },
+                {
+                    // 3. Corsproxy.io (ohne URL-Encoding für bessere Kompatibilität)
+                    url: `https://corsproxy.io/?${targetStr}`,
+                    process: async (res) => {
+                        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                        return res.json();
+                    }
+                },
+                {
+                    // 4. CodeTabs Proxy
+                    url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetStr)}`,
+                    process: async (res) => {
+                        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                        return res.json();
+                    }
+                }
+            ];
+
+            let lastError;
+
+            for (const strategy of fetchStrategies) {
+                try {
+                    const res = await fetch(strategy.url, {
+                        method: 'GET',
+                        headers: { 'Accept': 'application/json' }
+                    });
+                    const data = await strategy.process(res);
+                    console.log('[API] ✅ Erfolg über:', strategy.url);
+                    return data;
+                } catch (err) {
+                    console.warn('[API] ⚠️ Fehlschlag bei:', strategy.url, err.message);
+                    lastError = err;
+                }
             }
 
-            console.log('[API]', url.toString());
-
-            try {
-                const res = await fetch(url);
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const data = await res.json();
-                console.log('[API] ✅', data);
-                return data;
-            } catch (err) {
-                console.error('[API] ❌', err);
-                throw err;
-            }
+            console.error('[API] ❌ Alle Verbindungsversuche fehlgeschlagen', lastError);
+            throw lastError;
         }
 
         // ============================================================
@@ -275,10 +323,10 @@
             const badge = document.getElementById('apiStatusBadge');
             if (!badge) return;
             if (state.isLive) {
-                badge.textContent = '✅ Live';
+                badge.textContent = 'Live';
                 badge.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300';
             } else {
-                badge.textContent = '⚠️ Offline';
+                badge.textContent = 'Offline';
                 badge.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300';
             }
         }
@@ -394,7 +442,7 @@
         }
 
         // ============================================================
-        // 7. E-MAIL GENERIEREN (ÜBER PROXY)
+        // 7. E-MAIL GENERIEREN
         // ============================================================
         async function setupAccount(address) {
             if (state.address === address) return;
@@ -406,9 +454,7 @@
             state.isLive = true;
             updateUI();
 
-            // Willkommensnachricht
             addWelcomeMessage();
-
             await fetchMessages();
         }
 
@@ -433,7 +479,6 @@
                 if (state.domains.length === 0) await fetchDomains();
                 const domain = state.domains[Math.floor(Math.random() * state.domains.length)];
 
-                // Zufällige Adresse über Proxy generieren
                 const data = await callApi('genRandomMailbox', { count: 1 });
                 if (data && Array.isArray(data) && data.length > 0) {
                     await setupAccount(data[0]);
@@ -447,12 +492,18 @@
                 showToast('✅ Neue Adresse generiert');
             } catch (err) {
                 console.error(err);
-                showToast('❌ Fehler bei Generierung', 'error');
+                showToast('❌ Netzwerkfehler. API nicht erreichbar.', 'error');
+                
+                // Endlosschleife beim initialen "Lade..." Text vermeiden
+                const display = document.getElementById('emailDisplay');
+                if (display && display.textContent === 'Lade...') {
+                    display.textContent = 'Verbindungsfehler';
+                }
             }
         }
 
         // ============================================================
-        // 8. DOMAINS ABRUFEN (ÜBER PROXY)
+        // 8. DOMAINS ABRUFEN
         // ============================================================
         async function fetchDomains() {
             try {
@@ -474,7 +525,7 @@
         }
 
         // ============================================================
-        // 9. COPY & QR
+        // 9. COPY & QR & MODALS
         // ============================================================
         async function copyEmail() {
             if (!state.address) return;
@@ -551,7 +602,7 @@
         }
 
         // ============================================================
-        // 10. NACHRICHTEN ABRUFEN (ÜBER PROXY)
+        // 10. NACHRICHTEN ABRUFEN
         // ============================================================
         async function fetchMessages() {
             if (!state.address) {
@@ -569,7 +620,6 @@
                     return;
                 }
 
-                console.log('[fetchMessages] login:', login, 'domain:', domain);
                 const data = await callApi('getMessages', { login, domain });
 
                 if (data && Array.isArray(data)) {
@@ -588,20 +638,23 @@
                     state.messages.forEach(m => { if (m.id) seenMap[m.id] = m.seen; });
                     mapped.forEach(m => { if (seenMap[m.id] !== undefined) m.seen = seenMap[m.id]; });
 
-                    state.messages = mapped;
+                    // Behalte lokale "welcome_" Nachrichten
+                    const localMessages = state.messages.filter(m => m.id.toString().startsWith('welcome_'));
+                    state.messages = [...localMessages, ...mapped];
+                    
                     state.isLive = true;
                     updateStatusBadge();
 
-                    if (mapped.length > oldCount) {
+                    if (mapped.length + localMessages.length > oldCount && oldCount > 0) {
                         playNotificationSound();
-                        showToast(`📩 ${mapped.length - oldCount} neue Nachricht(en)`);
+                        showToast(`📩 Neue Nachricht erhalten`);
                     }
 
                     renderMessagesList();
-                    console.log('[fetchMessages] OK,', mapped.length, 'Nachrichten');
                 } else {
-                    console.warn('[fetchMessages] Keine Daten oder leeres Array');
-                    state.messages = [];
+                    // Behalte lokale Nachrichten wenn leeres Array zurückkommt
+                    const localMessages = state.messages.filter(m => m.id.toString().startsWith('welcome_'));
+                    state.messages = localMessages;
                     renderMessagesList();
                 }
             } catch (err) {
@@ -614,7 +667,7 @@
         }
 
         // ============================================================
-        // 11. NACHRICHT ÖFFNEN (ÜBER PROXY)
+        // 11. NACHRICHT ÖFFNEN
         // ============================================================
         async function openMessage(id) {
             state.currentMessageId = id;
@@ -630,7 +683,6 @@
             try {
                 let msgData;
 
-                // Willkommensnachricht
                 if (id.toString().startsWith('welcome_')) {
                     const mock = state.messages.find(m => m.id === id);
                     if (mock) {
@@ -655,7 +707,6 @@
 
                 if (!msgData) throw new Error('Keine Daten');
 
-                // Als gelesen markieren
                 const target = state.messages.find(m => m.id === id);
                 if (target) target.seen = true;
                 renderMessagesList();
@@ -697,6 +748,9 @@
             }
         }
 
+        // ============================================================
+        // 12. RENDER MESSAGES & UTILS
+        // ============================================================
         function downloadMessage() {
             if (!window.currentMessageText) return;
             const blob = new Blob([window.currentMessageText], { type: 'text/plain' });
@@ -711,9 +765,6 @@
             showToast('✅ E-Mail heruntergeladen');
         }
 
-        // ============================================================
-        // 12. RENDER MESSAGES
-        // ============================================================
         function renderMessagesList() {
             const listEl = document.getElementById('messagesList');
             const badge = document.getElementById('msgCountBadge');
