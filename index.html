@@ -1,9 +1,11 @@
 ﻿<!DOCTYPE html>
-<html lang="de">
+<html lang="de" class="h-full">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ProxyMail – Temporäre E-Mails</title>
+
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -12,419 +14,747 @@
                 extend: {
                     fontFamily: { sans: ['Roboto', 'sans-serif'] },
                     colors: {
-                        primary: '#0b57d0',
-                        primaryContainer: '#d3e3fd',
-                        surface: '#f8fafd',
-                        darkSurface: '#0f172a'
-                    }
+                        m3: {
+                            primary: '#0b57d0',
+                            onPrimary: '#ffffff',
+                            primaryContainer: '#d3e3fd',
+                            onPrimaryContainer: '#041e49',
+                            secondaryContainer: '#c2e7ff',
+                            onSecondaryContainer: '#001d35',
+                            surface: '#f8fafd',
+                            surfaceContainer: '#edf2fa',
+                            surfaceContainerHigh: '#e1e8f3',
+                            darkSurface: '#0f172a',
+                            darkSurfaceContainer: '#1e293b',
+                            darkPrimary: '#a8c7fa',
+                            darkPrimaryContainer: '#004a77',
+                        }
+                    },
+                    borderRadius: { '4xl': '2rem' }
                 }
             }
         }
     </script>
+
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,1,0" rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/1.4.19/Tone.js"></script>
+
     <style>
         body { font-family: 'Roboto', sans-serif; }
-        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .dark ::-webkit-scrollbar-thumb { background: #475569; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .icon-filled {
+            font-variation-settings: 'FILL' 1;
+        }
     </style>
 </head>
-<body class="min-h-screen bg-surface dark:bg-darkSurface text-slate-900 dark:text-slate-100">
+<body class="h-full bg-m3-surface text-slate-900 dark:bg-m3-darkSurface dark:text-slate-100 transition-colors duration-300 flex flex-col">
 
-    <!-- Header -->
-    <header class="sticky top-0 z-50 bg-surface dark:bg-darkSurface px-4 h-16 flex items-center justify-between border-b">
-        <div class="flex items-center gap-2">
-            <span class="material-symbols-outlined text-primary text-3xl">mail</span>
-            <h1 class="font-bold text-xl">ProxyMail</h1>
+    <!-- Top App Bar (dein Original-Design) -->
+    <header class="bg-m3-surface dark:bg-m3-darkSurface sticky top-0 z-30 px-4 sm:px-6 h-16 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-full bg-m3-primaryContainer dark:bg-m3-darkPrimaryContainer flex items-center justify-center text-m3-onPrimaryContainer dark:text-m3-darkPrimary">
+                <span class="material-symbols-outlined icon-filled">mail</span>
+            </div>
+            <div>
+                <h1 class="font-bold text-xl tracking-tight text-m3-onSurface dark:text-slate-100">ProxyMail</h1>
+            </div>
         </div>
-        <button onclick="toggleTheme()" class="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800">
-            <span id="themeIcon" class="material-symbols-outlined">dark_mode</span>
-        </button>
+        <div class="flex items-center space-x-2">
+            <button id="soundToggleBtn" onclick="toggleSound()" class="w-10 h-10 rounded-full flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 transition text-slate-600 dark:text-slate-300">
+                <span id="soundIcon" class="material-symbols-outlined">notifications_off</span>
+            </button>
+            <button onclick="toggleTheme()" class="w-10 h-10 rounded-full flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 transition text-slate-600 dark:text-slate-300">
+                <span id="themeIcon" class="material-symbols-outlined">light_mode</span>
+            </button>
+        </div>
     </header>
 
     <!-- Main -->
-    <main class="max-w-6xl mx-auto px-4 py-6">
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-4 flex flex-col gap-6">
 
-        <!-- Status -->
-        <div class="flex items-center gap-3 mb-4">
-            <span id="statusDot" class="w-3 h-3 rounded-full bg-red-500"></span>
-            <span id="statusText" class="text-sm font-medium text-red-500">Offline</span>
-            <span id="emailDisplay" class="text-sm font-mono bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full truncate max-w-[300px]">Keine Adresse</span>
-        </div>
-
-        <!-- Actions -->
-        <div class="flex flex-wrap gap-3 mb-6">
-            <button onclick="generateNewEmail()" class="px-6 py-2.5 rounded-full bg-primary text-white font-medium hover:opacity-90 transition flex items-center gap-2">
-                <span class="material-symbols-outlined text-[18px]">autorenew</span> Neue Adresse
-            </button>
-            <button onclick="copyEmail()" class="px-6 py-2.5 rounded-full border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition flex items-center gap-2">
-                <span class="material-symbols-outlined text-[18px]">content_copy</span> Kopieren
-            </button>
-            <button onclick="fetchMessages()" class="px-6 py-2.5 rounded-full border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition flex items-center gap-2">
-                <span class="material-symbols-outlined text-[18px]">refresh</span> Aktualisieren
-            </button>
-        </div>
+        <!-- Hero Card -->
+        <section class="bg-m3-surfaceContainer dark:bg-m3-darkSurfaceContainer rounded-[28px] p-6 sm:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative overflow-hidden">
+            <div class="flex-1 space-y-3 z-10 w-full">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <span class="text-sm font-medium text-m3-primary dark:text-m3-darkPrimary uppercase tracking-widest">Aktuelle Adresse</span>
+                        <span id="apiStatusBadge" class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">Live</span>
+                    </div>
+                    <div class="relative">
+                        <select id="historySelect" onchange="switchAccount(this.value)" class="appearance-none bg-white/50 dark:bg-black/20 border border-slate-300 dark:border-slate-700 rounded-full px-4 py-1.5 pr-8 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-m3-primary cursor-pointer text-slate-700 dark:text-slate-300">
+                            <option value="">Letzte Adressen...</option>
+                        </select>
+                        <span class="material-symbols-outlined absolute right-2 top-1.5 text-[18px] pointer-events-none text-slate-500">expand_more</span>
+                    </div>
+                </div>
+                <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+                    <div id="emailDisplay" class="text-2xl sm:text-4xl font-medium tracking-tight break-all select-all text-slate-900 dark:text-white">Lade...</div>
+                    <div class="flex items-center gap-2">
+                        <button onclick="copyEmail()" class="h-10 px-4 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center justify-center gap-2 text-sm font-medium transition shadow-sm">
+                            <span class="material-symbols-outlined text-[20px]">content_copy</span> Kopieren
+                        </button>
+                        <button onclick="showQRCode()" class="w-10 h-10 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center justify-center transition shadow-sm">
+                            <span class="material-symbols-outlined text-[20px]">qr_code_2</span>
+                        </button>
+                    </div>
+                </div>
+                <p class="text-xs text-slate-500 dark:text-slate-400">E-Mails werden automatisch nach 7 Tagen gelöscht.</p>
+            </div>
+            <div class="flex flex-col gap-3 w-full md:w-auto z-10 shrink-0">
+                <button onclick="generateNewEmail()" class="w-full md:w-auto px-6 py-3 rounded-full bg-m3-primary dark:bg-m3-darkPrimary text-white dark:text-m3-onPrimaryContainer hover:opacity-90 font-medium transition flex items-center justify-center gap-2 shadow-md">
+                    <span class="material-symbols-outlined text-[20px]">autorenew</span> Neue Adresse
+                </button>
+                <button onclick="openCustomModal()" class="w-full md:w-auto px-6 py-3 rounded-full bg-m3-secondaryContainer dark:bg-slate-800 text-m3-onSecondaryContainer dark:text-slate-200 hover:bg-black/5 dark:hover:bg-slate-700 font-medium transition flex items-center justify-center gap-2">
+                    <span class="material-symbols-outlined text-[20px]">edit</span> Wunschname
+                </button>
+            </div>
+            <div class="absolute -right-20 -top-20 w-64 h-64 bg-m3-primary/5 dark:bg-m3-darkPrimary/5 rounded-full blur-3xl pointer-events-none"></div>
+        </section>
 
         <!-- Inbox -->
-        <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
-            <!-- Liste -->
-            <div class="md:col-span-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
-                <div class="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
-                    <span class="font-medium">Posteingang</span>
-                    <span id="countBadge" class="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-bold">0</span>
+        <section class="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 min-h-[500px]">
+            <div class="lg:col-span-5 bg-white dark:bg-m3-darkSurfaceContainer border border-slate-200 dark:border-slate-800 rounded-[28px] flex flex-col overflow-hidden">
+                <div class="p-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <span class="material-symbols-outlined icon-filled text-slate-400">inbox</span>
+                        <h2 class="font-medium">Posteingang</h2>
+                        <span id="msgCountBadge" class="ml-2 px-2.5 py-0.5 rounded-full text-xs font-medium bg-m3-primaryContainer dark:bg-m3-darkPrimaryContainer text-m3-onPrimaryContainer dark:text-m3-darkPrimary">0</span>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <button onclick="fetchMessages()" title="Jetzt aktualisieren" class="w-9 h-9 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center justify-center transition text-slate-600 dark:text-slate-300">
+                            <span id="refreshSpinner" class="material-symbols-outlined text-[20px]">refresh</span>
+                        </button>
+                    </div>
                 </div>
-                <div id="messageList" class="h-[400px] overflow-y-auto p-2">
-                    <div class="flex flex-col items-center justify-center h-full text-slate-400">
-                        <span class="material-symbols-outlined text-5xl">inbox</span>
-                        <p class="text-sm mt-2">Keine Nachrichten</p>
+                <div id="messagesList" class="overflow-y-auto flex-1 max-h-[600px]">
+                    <div class="flex flex-col items-center justify-center p-8 text-center h-full min-h-[300px]">
+                        <span class="material-symbols-outlined text-[48px] text-slate-300 dark:text-slate-600 mb-4">mark_email_unread</span>
+                        <h3 class="font-medium text-slate-700 dark:text-slate-300">Keine E-Mails</h3>
+                        <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Warte auf eingehende Nachrichten...</p>
+                    </div>
+                </div>
+                <div class="px-5 py-3 bg-slate-50/50 dark:bg-black/10 border-t border-slate-100 dark:border-slate-700 text-xs text-slate-500 dark:text-slate-400 flex items-center justify-between">
+                    <span class="flex items-center gap-2">
+                        <span class="relative flex h-2 w-2">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-m3-primary opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-2 w-2 bg-m3-primary"></span>
+                        </span>
+                        Auto-Update
+                    </span>
+                    <span id="countdownTimer" class="font-mono">10s</span>
+                </div>
+            </div>
+            <div class="lg:col-span-7 bg-white dark:bg-m3-darkSurfaceContainer border border-slate-200 dark:border-slate-800 rounded-[28px] flex flex-col overflow-hidden min-h-[500px]">
+                <div id="messageDetail" class="flex-1 flex flex-col h-full">
+                    <div class="flex flex-col items-center justify-center p-8 text-center h-full my-auto">
+                        <span class="material-symbols-outlined text-[64px] text-slate-200 dark:text-slate-700 mb-4">mail</span>
+                        <h3 class="font-medium text-slate-600 dark:text-slate-400">Keine Nachricht ausgewählt</h3>
                     </div>
                 </div>
             </div>
-
-            <!-- Detail -->
-            <div class="md:col-span-7 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
-                <div id="detailView" class="h-[400px] flex flex-col items-center justify-center text-slate-400 p-6">
-                    <span class="material-symbols-outlined text-5xl">mail</span>
-                    <p class="text-sm mt-2">Wähle eine Nachricht</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Auto-Refresh Info -->
-        <div class="mt-4 text-xs text-slate-400 flex justify-between">
-            <span>🔄 Auto-Update alle <span id="timerDisplay">10</span>s</span>
-            <span id="apiInfo">Wird geladen...</span>
-        </div>
+        </section>
     </main>
 
-    <!-- Toast -->
-    <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-800 px-6 py-3 rounded-2xl shadow-lg text-sm font-medium transition-all duration-300 transform translate-y-20 opacity-0 pointer-events-none">
-        <span id="toastMsg">Nachricht</span>
+    <!-- Modals -->
+    <div id="customModal" class="fixed inset-0 bg-slate-900/40 dark:bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden transition-opacity duration-300 opacity-0 pointer-events-none">
+        <div class="bg-white dark:bg-m3-darkSurface border border-slate-200 dark:border-slate-800 rounded-[28px] max-w-md w-full p-6 sm:p-8 shadow-2xl transform scale-95 transition-transform duration-300">
+            <h3 class="font-medium text-xl mb-2 text-slate-900 dark:text-white">Wunschadresse</h3>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mb-6">Erstelle eine personalisierte ProxyMail-Adresse.</p>
+            <form onsubmit="handleCustomEmailSubmit(event)" class="space-y-5">
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5 ml-1">Benutzername</label>
+                    <div class="flex bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-300 dark:border-slate-700 focus-within:ring-2 focus-within:ring-m3-primary overflow-hidden">
+                        <input type="text" id="customUsername" required pattern="[a-zA-Z0-9._-]+" placeholder="z.b. alias123" class="flex-1 bg-transparent px-4 py-3 text-sm focus:outline-none dark:text-white">
+                        <span class="inline-flex items-center px-4 bg-slate-100 dark:bg-slate-800 text-slate-500 border-l border-slate-300 dark:border-slate-700 text-sm font-mono">@domain</span>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5 ml-1">Domain wählen</label>
+                    <select id="customDomainSelect" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-m3-primary dark:text-white cursor-pointer appearance-none">
+                        <option value="">Lade Domains...</option>
+                    </select>
+                </div>
+                <div class="pt-4 flex justify-end gap-3">
+                    <button type="button" onclick="closeCustomModal()" class="px-5 py-2.5 rounded-full text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-800 transition text-slate-700 dark:text-slate-300">Abbrechen</button>
+                    <button type="submit" class="px-5 py-2.5 rounded-full bg-m3-primary dark:bg-m3-darkPrimary text-white dark:text-m3-onPrimaryContainer text-sm font-medium shadow-md hover:opacity-90 transition">Erstellen</button>
+                </div>
+            </form>
+        </div>
     </div>
+
+    <div id="qrModal" class="fixed inset-0 bg-slate-900/40 dark:bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden transition-opacity duration-300 opacity-0 pointer-events-none">
+        <div class="bg-white dark:bg-m3-darkSurface border border-slate-200 dark:border-slate-800 rounded-[28px] max-w-sm w-full p-8 shadow-2xl text-center transform scale-95 transition-transform duration-300">
+            <h3 class="font-medium text-xl mb-4 text-slate-900 dark:text-white">Scannen zum Kopieren</h3>
+            <div class="bg-white p-4 rounded-2xl mx-auto inline-block shadow-sm border border-slate-100 mb-6">
+                <img id="qrCodeImg" src="" alt="QR Code" class="w-48 h-48">
+            </div>
+            <p id="qrEmailText" class="text-sm font-mono text-slate-600 dark:text-slate-400 mb-6 break-all"></p>
+            <button onclick="closeQRModal()" class="w-full px-5 py-3 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-sm font-medium transition">Schließen</button>
+        </div>
+    </div>
+
+    <div id="toastContainer" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 pointer-events-none w-full max-w-sm px-4"></div>
 
     <script>
         // ============================================================
-        // 1. KONFIGURATION
+        // 1. KONFIGURATION – JETZT MIT EIGENEM PROXY!
         // ============================================================
-        const API = 'https://api.mail.tm';
+        // Der Proxy leitet alle Anfragen an 1secmail weiter und umgeht CORS
+        const PROXY_URL = '/api/proxy';
 
         // ============================================================
         // 2. STATE
         // ============================================================
         let state = {
-            token: localStorage.getItem('pm_token') || null,
             address: localStorage.getItem('pm_address') || null,
-            id: localStorage.getItem('pm_id') || null,
-            password: localStorage.getItem('pm_password') || null,
+            domains: [],
+            history: JSON.parse(localStorage.getItem('pm_history') || '[]'),
             messages: [],
-            currentId: null,
+            currentMessageId: null,
             countdown: 10,
+            soundEnabled: localStorage.getItem('pm_sound') === 'true',
             isLive: false
         };
 
         // ============================================================
-        // 3. TOAST
+        // 3. API HELPER (ÜBER PROXY)
         // ============================================================
-        function showToast(msg, type = 'success') {
-            const el = document.getElementById('toast');
-            const msgEl = document.getElementById('toastMsg');
-            msgEl.textContent = msg;
-            el.className = `fixed bottom-6 left-1/2 -translate-x-1/2 px-6 py-3 rounded-2xl shadow-lg text-sm font-medium transition-all duration-300 transform translate-y-0 opacity-100 pointer-events-auto ${type === 'error' ? 'bg-red-600 text-white' : 'bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-800'}`;
-            setTimeout(() => {
-                el.className = el.className.replace('translate-y-0 opacity-100', 'translate-y-20 opacity-0');
-            }, 3000);
-        }
+        async function callApi(action, params = {}) {
+            const url = new URL(PROXY_URL, window.location.origin);
+            url.searchParams.set('action', action);
+            for (const [key, value] of Object.entries(params)) {
+                if (value) url.searchParams.set(key, value);
+            }
 
-        // ============================================================
-        // 4. STATUS
-        // ============================================================
-        function setStatus(live) {
-            state.isLive = live;
-            const dot = document.getElementById('statusDot');
-            const text = document.getElementById('statusText');
-            if (live) {
-                dot.className = 'w-3 h-3 rounded-full bg-green-500';
-                text.className = 'text-sm font-medium text-green-500';
-                text.textContent = 'Live';
-            } else {
-                dot.className = 'w-3 h-3 rounded-full bg-red-500';
-                text.className = 'text-sm font-medium text-red-500';
-                text.textContent = 'Offline';
+            console.log('[API]', url.toString());
+
+            try {
+                const res = await fetch(url);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                console.log('[API] ✅', data);
+                return data;
+            } catch (err) {
+                console.error('[API] ❌', err);
+                throw err;
             }
         }
 
-        function updateUI() {
-            const display = document.getElementById('emailDisplay');
-            display.textContent = state.address || 'Keine Adresse';
-            renderMessages();
-            setStatus(state.isLive);
+        // ============================================================
+        // 4. UI HELPER
+        // ============================================================
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `pointer-events-auto flex items-center justify-between gap-3 px-4 py-3 rounded-2xl shadow-lg text-sm font-medium transition-all duration-300 transform translate-y-8 opacity-0 
+                ${type === 'success' ? 'bg-m3-darkSurfaceContainer text-white' : 'bg-red-600 text-white'}`;
+            toast.innerHTML = `
+                <div class="flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[18px]">${type === 'success' ? 'check_circle' : 'error'}</span>
+                    <span>${message}</span>
+                </div>
+            `;
+            container.appendChild(toast);
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-y-8', 'opacity-0');
+            });
+            setTimeout(() => {
+                toast.classList.add('translate-y-8', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function updateStatusBadge() {
+            const badge = document.getElementById('apiStatusBadge');
+            if (!badge) return;
+            if (state.isLive) {
+                badge.textContent = '✅ Live';
+                badge.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300';
+            } else {
+                badge.textContent = '⚠️ Offline';
+                badge.className = 'px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300';
+            }
         }
 
         // ============================================================
-        // 5. THEME
+        // 5. THEME & SOUND
         // ============================================================
-        function toggleTheme() {
-            document.documentElement.classList.toggle('dark');
-            const isDark = document.documentElement.classList.contains('dark');
-            localStorage.theme = isDark ? 'dark' : 'light';
-            document.getElementById('themeIcon').textContent = isDark ? 'light_mode' : 'dark_mode';
-        }
-
         function initTheme() {
             const isDark = localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches);
             if (isDark) {
                 document.documentElement.classList.add('dark');
+                document.getElementById('themeIcon').textContent = 'dark_mode';
+            } else {
+                document.documentElement.classList.remove('dark');
                 document.getElementById('themeIcon').textContent = 'light_mode';
             }
+            updateSoundIcon();
         }
 
-        // ============================================================
-        // 6. API CALLS
-        // ============================================================
-        async function apiFetch(endpoint, options = {}) {
-            const url = `${API}${endpoint}`;
-            const res = await fetch(url, {
-                ...options,
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(state.token ? { 'Authorization': `Bearer ${state.token}` } : {}),
-                    ...options.headers
-                }
-            });
-            if (!res.ok) {
-                const err = await res.json().catch(() => ({}));
-                throw new Error(err.detail || err.message || `HTTP ${res.status}`);
+        function toggleTheme() {
+            document.documentElement.classList.toggle('dark');
+            const isDark = document.documentElement.classList.contains('dark');
+            localStorage.theme = isDark ? 'dark' : 'light';
+            document.getElementById('themeIcon').textContent = isDark ? 'dark_mode' : 'light_mode';
+        }
+
+        function updateSoundIcon() {
+            document.getElementById('soundIcon').textContent = state.soundEnabled ? 'notifications_active' : 'notifications_off';
+            const btn = document.getElementById('soundToggleBtn');
+            if (state.soundEnabled) {
+                btn.classList.add('text-m3-primary', 'dark:text-m3-darkPrimary');
+            } else {
+                btn.classList.remove('text-m3-primary', 'dark:text-m3-darkPrimary');
             }
-            return res.json();
         }
 
-        // ============================================================
-        // 7. ACCOUNT ERSTELLEN
-        // ============================================================
-        async function createAccount() {
+        async function toggleSound() {
+            state.soundEnabled = !state.soundEnabled;
+            localStorage.setItem('pm_sound', state.soundEnabled);
+            updateSoundIcon();
+            if (state.soundEnabled) {
+                await Tone.start();
+                playNotificationSound();
+                showToast('🔊 Audio-Benachrichtigungen aktiviert');
+            } else {
+                showToast('🔇 Audio stummgeschaltet');
+            }
+        }
+
+        function playNotificationSound() {
+            if (!state.soundEnabled) return;
             try {
-                // Domains abrufen
-                const domains = await apiFetch('/domains');
-                const domainList = domains['hydra:member'] || [{ domain: 'mail.tm' }];
-                const domain = domainList[Math.floor(Math.random() * domainList.length)].domain;
-                
-                const randomStr = Math.random().toString(36).substring(2, 10);
-                const address = `pm_${randomStr}@${domain}`;
-                const password = Math.random().toString(36).slice(-12) + 'A1!';
-
-                // Account erstellen
-                await apiFetch('/accounts', {
-                    method: 'POST',
-                    body: JSON.stringify({ address, password })
-                });
-
-                // Token holen
-                const tokenData = await apiFetch('/token', {
-                    method: 'POST',
-                    body: JSON.stringify({ address, password })
-                });
-
-                state.token = tokenData.token;
-                state.address = address;
-                state.id = tokenData.id;
-                state.password = password;
-
-                localStorage.setItem('pm_token', state.token);
-                localStorage.setItem('pm_address', state.address);
-                localStorage.setItem('pm_id', state.id);
-                localStorage.setItem('pm_password', state.password);
-
-                state.isLive = true;
-                updateUI();
-                showToast(`✅ ${address}`);
-
-                // Willkommensnachricht (lokal)
-                addWelcomeMessage();
-
-                // E-Mails abrufen
-                await fetchMessages();
-
-                return true;
-            } catch (err) {
-                console.error('[CREATE] Fehler:', err);
-                showToast('❌ ' + err.message, 'error');
-                state.isLive = false;
-                setStatus(false);
-                return false;
-            }
+                const synth = new Tone.PolySynth(Tone.Synth, {
+                    oscillator: { type: "sine" },
+                    envelope: { attack: 0.01, decay: 0.1, sustain: 0.1, release: 1 }
+                }).toDestination();
+                const now = Tone.now();
+                synth.triggerAttackRelease(["C5", "E5"], "16n", now);
+                synth.triggerAttackRelease("G5", "16n", now + 0.15);
+            } catch (e) { /* fallback silent */ }
         }
 
         // ============================================================
-        // 8. WILLKOMMENSNACHRICHT (Lokal)
+        // 6. ACCOUNT MANAGEMENT
         // ============================================================
+        function addToHistory(address) {
+            if (!address) return;
+            state.history = state.history.filter(h => h !== address);
+            state.history.unshift(address);
+            if (state.history.length > 5) state.history.pop();
+            localStorage.setItem('pm_history', JSON.stringify(state.history));
+            renderHistorySelect();
+        }
+
+        function renderHistorySelect() {
+            const select = document.getElementById('historySelect');
+            if (state.history.length <= 1) {
+                select.classList.add('hidden');
+                select.nextElementSibling.classList.add('hidden');
+                return;
+            }
+            select.classList.remove('hidden');
+            select.nextElementSibling.classList.remove('hidden');
+            let options = '<option value="">Verlauf (Letzte 5)</option>';
+            state.history.forEach((addr, index) => {
+                const isCurrent = addr === state.address;
+                options += `<option value="${index}" ${isCurrent ? 'disabled' : ''}>${addr} ${isCurrent ? '(Aktiv)' : ''}</option>`;
+            });
+            select.innerHTML = options;
+        }
+
+        async function switchAccount(historyIndex) {
+            if (historyIndex === "") return;
+            const address = state.history[parseInt(historyIndex)];
+            if (!address) return;
+            state.address = address;
+            localStorage.setItem('pm_address', state.address);
+            addToHistory(address);
+            state.messages = [];
+            state.currentMessageId = null;
+            updateUI();
+            await fetchMessages();
+            showToast(`Gewechselt zu ${state.address}`);
+        }
+
+        function updateUI() {
+            const display = document.getElementById('emailDisplay');
+            if (display && state.address) {
+                display.textContent = state.address;
+            }
+            renderHistorySelect();
+            updateStatusBadge();
+        }
+
+        // ============================================================
+        // 7. E-MAIL GENERIEREN (ÜBER PROXY)
+        // ============================================================
+        async function setupAccount(address) {
+            if (state.address === address) return;
+            state.address = address;
+            localStorage.setItem('pm_address', state.address);
+            addToHistory(address);
+            state.messages = [];
+            state.currentMessageId = null;
+            state.isLive = true;
+            updateUI();
+
+            // Willkommensnachricht
+            addWelcomeMessage();
+
+            await fetchMessages();
+        }
+
         function addWelcomeMessage() {
             const welcome = {
                 id: 'welcome_' + Date.now(),
-                from: { address: 'hello@proxymail.local', name: 'ProxyMail Team' },
+                from: 'ProxyMail Team <hello@proxymail.local>',
                 subject: '🎉 Willkommen bei ProxyMail!',
-                createdAt: new Date().toISOString(),
+                date: new Date().toISOString().replace('T', ' ').substring(0, 19),
                 intro: 'Deine temporäre E-Mail-Adresse ist bereit.',
-                text: 'Hallo!\n\nDeine temporäre E-Mail-Adresse ist einsatzbereit.\n\n✅ E-Mails werden automatisch abgerufen\n✅ Nach 7 Tagen gelöscht\n✅ Keine Registrierung nötig\n\nViel Spaß mit ProxyMail!\n\n- Dein ProxyMail Team',
-                isWelcome: true
+                seen: false,
+                body: 'Hallo!\n\nDeine temporäre E-Mail-Adresse ist einsatzbereit. Du kannst sie überall nutzen, wo du deine echte Adresse nicht preisgeben möchtest.\n\n✅ E-Mails werden automatisch abgerufen\n✅ Nach 7 Tagen automatisch gelöscht\n✅ Keine Registrierung nötig\n\nViel Spaß mit ProxyMail!'
             };
             state.messages = [welcome, ...state.messages];
-            renderMessages();
-            document.getElementById('countBadge').textContent = state.messages.length;
+            renderMessagesList();
+            playNotificationSound();
             showToast('📩 Willkommensnachricht erhalten');
         }
 
-        // ============================================================
-        // 9. NEUE ADRESSE
-        // ============================================================
         async function generateNewEmail() {
-            document.getElementById('statusText').textContent = 'Wird erstellt...';
-            await createAccount();
+            try {
+                if (state.domains.length === 0) await fetchDomains();
+                const domain = state.domains[Math.floor(Math.random() * state.domains.length)];
+
+                // Zufällige Adresse über Proxy generieren
+                const data = await callApi('genRandomMailbox', { count: 1 });
+                if (data && Array.isArray(data) && data.length > 0) {
+                    await setupAccount(data[0]);
+                    showToast('✅ Neue Adresse generiert');
+                    return;
+                }
+
+                // Fallback
+                const randomStr = Math.random().toString(36).substring(2, 10);
+                await setupAccount(`proxy_${randomStr}@${domain}`);
+                showToast('✅ Neue Adresse generiert');
+            } catch (err) {
+                console.error(err);
+                showToast('❌ Fehler bei Generierung', 'error');
+            }
         }
 
         // ============================================================
-        // 10. NACHRICHTEN ABRUFEN
+        // 8. DOMAINS ABRUFEN (ÜBER PROXY)
+        // ============================================================
+        async function fetchDomains() {
+            try {
+                const data = await callApi('getDomainList');
+                if (data && data.length > 0) {
+                    state.domains = data;
+                } else {
+                    state.domains = ['1secmail.com', '1secmail.org', '1secmail.net'];
+                }
+            } catch (err) {
+                console.warn('Domain fetch failed, using fallbacks', err);
+                state.domains = ['1secmail.com', '1secmail.org', '1secmail.net'];
+            } finally {
+                const select = document.getElementById('customDomainSelect');
+                if (select) {
+                    select.innerHTML = state.domains.map(d => `<option value="${d}">${d}</option>`).join('');
+                }
+            }
+        }
+
+        // ============================================================
+        // 9. COPY & QR
+        // ============================================================
+        async function copyEmail() {
+            if (!state.address) return;
+            try {
+                await navigator.clipboard.writeText(state.address);
+                showToast('✅ Adresse kopiert!');
+            } catch (err) {
+                const textArea = document.createElement('textarea');
+                textArea.value = state.address;
+                textArea.style.position = 'fixed';
+                textArea.style.left = '-9999px';
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    showToast('✅ Adresse kopiert!');
+                } catch (e) {
+                    showToast('❌ Kopieren fehlgeschlagen', 'error');
+                }
+                document.body.removeChild(textArea);
+            }
+        }
+
+        function showQRCode() {
+            if (!state.address) return;
+            const modal = document.getElementById('qrModal');
+            const img = document.getElementById('qrCodeImg');
+            document.getElementById('qrEmailText').textContent = state.address;
+            img.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=mailto:${encodeURIComponent(state.address)}&margin=10`;
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0', 'pointer-events-none');
+                modal.querySelector('div').classList.remove('scale-95');
+            }, 10);
+        }
+
+        function closeQRModal() {
+            const modal = document.getElementById('qrModal');
+            modal.classList.add('opacity-0', 'pointer-events-none');
+            modal.querySelector('div').classList.add('scale-95');
+            setTimeout(() => modal.classList.add('hidden'), 300);
+        }
+
+        function closeCustomModal() {
+            const modal = document.getElementById('customModal');
+            modal.classList.add('opacity-0', 'pointer-events-none');
+            modal.querySelector('div').classList.add('scale-95');
+            setTimeout(() => modal.classList.add('hidden'), 300);
+        }
+
+        function openCustomModal() {
+            const modal = document.getElementById('customModal');
+            modal.classList.remove('hidden');
+            if (state.domains.length === 0) fetchDomains();
+            setTimeout(() => {
+                modal.classList.remove('opacity-0', 'pointer-events-none');
+                modal.querySelector('div').classList.remove('scale-95');
+                document.getElementById('customUsername').focus();
+            }, 10);
+        }
+
+        async function handleCustomEmailSubmit(e) {
+            e.preventDefault();
+            const username = document.getElementById('customUsername').value.trim();
+            const domain = document.getElementById('customDomainSelect').value;
+            const address = `${username}@${domain}`;
+            try {
+                await setupAccount(address);
+                closeCustomModal();
+                showToast(`✅ Wunschadresse erstellt!`);
+            } catch (err) {
+                showToast('❌ Fehler beim Erstellen', 'error');
+            }
+        }
+
+        // ============================================================
+        // 10. NACHRICHTEN ABRUFEN (ÜBER PROXY)
         // ============================================================
         async function fetchMessages() {
-            if (!state.token || !state.address) {
-                console.warn('Kein Token/Adresse');
+            if (!state.address) {
+                console.warn('[fetchMessages] Keine Adresse');
                 return;
             }
 
+            const spinner = document.getElementById('refreshSpinner');
+            if (spinner) spinner.classList.add('animate-spin');
+
             try {
-                const data = await apiFetch('/messages');
-                const newMessages = data['hydra:member'] || [];
-
-                // Seen-Status erhalten
-                const seenMap = {};
-                state.messages.forEach(m => { if (m.id && !m.isWelcome) seenMap[m.id] = m.seen; });
-
-                const mapped = newMessages.map(msg => ({
-                    ...msg,
-                    seen: seenMap[msg.id] || false
-                }));
-
-                // Willkommensnachricht erhalten
-                const welcomeMsg = state.messages.find(m => m.isWelcome);
-                state.messages = welcomeMsg ? [welcomeMsg, ...mapped] : mapped;
-
-                state.isLive = true;
-                setStatus(true);
-                renderMessages();
-                document.getElementById('countBadge').textContent = state.messages.length;
-
-                if (mapped.length > 0) {
-                    showToast(`📩 ${mapped.length} Nachricht(en)`);
+                const [login, domain] = state.address.split('@');
+                if (!login || !domain) {
+                    console.warn('[fetchMessages] Ungültige Adresse:', state.address);
+                    return;
                 }
 
-                document.getElementById('apiInfo').textContent = `Letzte Aktualisierung: ${new Date().toLocaleTimeString()}`;
+                console.log('[fetchMessages] login:', login, 'domain:', domain);
+                const data = await callApi('getMessages', { login, domain });
+
+                if (data && Array.isArray(data)) {
+                    const oldCount = state.messages.length;
+                    const mapped = data.map(msg => ({
+                        id: msg.id,
+                        from: msg.from || 'Unbekannt',
+                        subject: msg.subject || '(Kein Betreff)',
+                        date: msg.date || new Date().toISOString().replace('T', ' ').substring(0, 19),
+                        intro: msg.subject || '',
+                        seen: false
+                    }));
+
+                    // Seen-Status erhalten
+                    const seenMap = {};
+                    state.messages.forEach(m => { if (m.id) seenMap[m.id] = m.seen; });
+                    mapped.forEach(m => { if (seenMap[m.id] !== undefined) m.seen = seenMap[m.id]; });
+
+                    state.messages = mapped;
+                    state.isLive = true;
+                    updateStatusBadge();
+
+                    if (mapped.length > oldCount) {
+                        playNotificationSound();
+                        showToast(`📩 ${mapped.length - oldCount} neue Nachricht(en)`);
+                    }
+
+                    renderMessagesList();
+                    console.log('[fetchMessages] OK,', mapped.length, 'Nachrichten');
+                } else {
+                    console.warn('[fetchMessages] Keine Daten oder leeres Array');
+                    state.messages = [];
+                    renderMessagesList();
+                }
             } catch (err) {
-                console.error('[FETCH] Fehler:', err);
+                console.error('[fetchMessages] FEHLER:', err);
                 state.isLive = false;
-                setStatus(false);
-                // Wenn Token abgelaufen, neue Adresse generieren
-                if (err.message.includes('401') || err.message.includes('JWT')) {
-                    showToast('Token abgelaufen – neue Adresse wird erstellt...', 'error');
-                    await generateNewEmail();
-                }
+                updateStatusBadge();
+            } finally {
+                if (spinner) spinner.classList.remove('animate-spin');
             }
         }
 
         // ============================================================
-        // 11. NACHRICHT ÖFFNEN
+        // 11. NACHRICHT ÖFFNEN (ÜBER PROXY)
         // ============================================================
         async function openMessage(id) {
-            if (id.startsWith('welcome_')) {
-                const msg = state.messages.find(m => m.id === id);
-                if (msg) {
-                    renderDetail(msg);
-                    state.currentId = id;
-                    renderMessages();
-                }
-                return;
-            }
+            state.currentMessageId = id;
+            renderMessagesList();
 
-            state.currentId = id;
-            renderMessages();
+            const detailEl = document.getElementById('messageDetail');
+            detailEl.innerHTML = `
+                <div class="flex items-center justify-center h-full p-8">
+                    <span class="material-symbols-outlined text-[32px] animate-spin text-m3-primary">sync</span>
+                </div>
+            `;
 
             try {
-                const msg = await apiFetch(`/messages/${id}`);
-                renderDetail(msg);
+                let msgData;
+
+                // Willkommensnachricht
+                if (id.toString().startsWith('welcome_')) {
+                    const mock = state.messages.find(m => m.id === id);
+                    if (mock) {
+                        msgData = {
+                            id: mock.id,
+                            from: mock.from,
+                            subject: mock.subject,
+                            date: mock.date,
+                            textBody: mock.body || mock.intro || '',
+                            htmlBody: ''
+                        };
+                    }
+                } else {
+                    const [login, domain] = state.address.split('@');
+                    const data = await callApi('readMessage', { login, domain, id });
+                    if (data && data.id) {
+                        msgData = data;
+                    } else {
+                        throw new Error('Keine Daten');
+                    }
+                }
+
+                if (!msgData) throw new Error('Keine Daten');
 
                 // Als gelesen markieren
                 const target = state.messages.find(m => m.id === id);
                 if (target) target.seen = true;
-                renderMessages();
+                renderMessagesList();
 
-            } catch (err) {
-                console.error('[OPEN] Fehler:', err);
-                showToast('❌ Nachricht konnte nicht geladen werden', 'error');
-            }
-        }
+                window.currentMessageText = `Von: ${msgData.from || 'Unbekannt'}\nDatum: ${msgData.date || ''}\nBetreff: ${msgData.subject || ''}\n\n${msgData.textBody || ''}`;
 
-        function renderDetail(msg) {
-            const el = document.getElementById('detailView');
-            const from = msg.from?.address || msg.from?.name || 'Unbekannt';
-            const fromName = msg.from?.name || from;
-            const date = msg.createdAt ? new Date(msg.createdAt).toLocaleString() : 'Unbekannt';
-            const initial = fromName.charAt(0).toUpperCase();
+                const senderInitial = msgData.from ? msgData.from.charAt(0).toUpperCase() : '?';
+                const displayDate = msgData.date ? msgData.date.replace('T', ' ').substring(0, 19) : 'Unbekannt';
 
-            el.innerHTML = `
-                <div class="w-full h-full flex flex-col">
-                    <div class="p-4 border-b border-slate-200 dark:border-slate-800">
-                        <h2 class="text-xl font-bold">${msg.subject || '(Kein Betreff)'}</h2>
-                        <div class="flex items-center gap-3 mt-3">
-                            <div class="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center font-bold text-primary">${initial}</div>
-                            <div>
-                                <div class="font-medium">${fromName}</div>
-                                <div class="text-xs text-slate-400">${date}</div>
+                detailEl.innerHTML = `
+                    <div class="p-6 border-b border-slate-100 dark:border-slate-800">
+                        <div class="flex justify-between items-start mb-4">
+                            <h2 class="text-2xl font-medium text-slate-900 dark:text-white">${msgData.subject || '(Kein Betreff)'}</h2>
+                            <button onclick="downloadMessage()" class="w-10 h-10 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center transition text-slate-600 dark:text-slate-300">
+                                <span class="material-symbols-outlined text-[20px]">download</span>
+                            </button>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <div class="w-12 h-12 rounded-full bg-m3-primaryContainer dark:bg-m3-darkPrimaryContainer flex items-center justify-center text-m3-onPrimaryContainer font-bold text-lg">
+                                ${senderInitial}
+                            </div>
+                            <div class="text-sm">
+                                <div class="font-medium text-slate-900 dark:text-white">${msgData.from || 'Unbekannt'}</div>
+                                <div class="text-slate-500 text-xs mt-0.5">An: ${state.address} • ${displayDate}</div>
                             </div>
                         </div>
                     </div>
-                    <div class="flex-1 overflow-y-auto p-4 bg-slate-50 dark:bg-slate-800/50">
-                        ${msg.html ? 
-                            `<iframe class="w-full h-full min-h-[200px] bg-white dark:bg-slate-900 rounded-lg border-0" srcdoc="${msg.html.replace(/"/g, '&quot;')}"></iframe>` :
-                            `<pre class="whitespace-pre-wrap font-sans text-sm">${msg.text || 'Kein Inhalt'}</pre>`
+                    <div class="p-6 flex-1 overflow-y-auto bg-slate-50/50 dark:bg-black/10">
+                        ${msgData.htmlBody ? 
+                            `<iframe class="w-full h-full min-h-[400px] bg-white rounded-xl border border-slate-200 dark:border-transparent" srcdoc="${escapeHtmlAttr(msgData.htmlBody)}"></iframe>` :
+                            `<div class="whitespace-pre-wrap font-sans text-sm text-slate-800 dark:text-slate-200">${escapeHtml(msgData.textBody || '')}</div>`
                         }
                     </div>
-                </div>
-            `;
+                `;
+
+            } catch (err) {
+                console.error('[openMessage] Fehler:', err);
+                detailEl.innerHTML = `<div class="p-8 text-center text-red-500">❌ Nachricht konnte nicht geladen werden</div>`;
+            }
+        }
+
+        function downloadMessage() {
+            if (!window.currentMessageText) return;
+            const blob = new Blob([window.currentMessageText], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Email_${new Date().getTime()}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast('✅ E-Mail heruntergeladen');
         }
 
         // ============================================================
         // 12. RENDER MESSAGES
         // ============================================================
-        function renderMessages() {
-            const list = document.getElementById('messageList');
-            const badge = document.getElementById('countBadge');
+        function renderMessagesList() {
+            const listEl = document.getElementById('messagesList');
+            const badge = document.getElementById('msgCountBadge');
+            badge.textContent = state.messages.length;
 
             if (state.messages.length === 0) {
-                list.innerHTML = `
-                    <div class="flex flex-col items-center justify-center h-full text-slate-400">
-                        <span class="material-symbols-outlined text-5xl">inbox</span>
-                        <p class="text-sm mt-2">Keine Nachrichten</p>
+                listEl.innerHTML = `
+                    <div class="flex flex-col items-center justify-center p-8 text-center h-full min-h-[300px]">
+                        <span class="material-symbols-outlined text-[48px] text-slate-300 dark:text-slate-600 mb-4">mark_email_unread</span>
+                        <h3 class="font-medium text-slate-700 dark:text-slate-300">Posteingang leer</h3>
+                        <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">E-Mails erscheinen hier automatisch.</p>
                     </div>
                 `;
-                badge.textContent = '0';
                 return;
             }
 
-            badge.textContent = state.messages.length;
+            listEl.innerHTML = state.messages.map(msg => {
+                let dateStr = msg.date || '';
+                try {
+                    const d = new Date(dateStr.replace(' ', 'T'));
+                    dateStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                } catch(e) {}
 
-            list.innerHTML = state.messages.map(msg => {
-                const isSelected = msg.id === state.currentId;
-                const isUnread = !msg.seen && !msg.isWelcome;
-                const from = msg.from?.name || msg.from?.address || 'Unbekannt';
-                const initial = from.charAt(0).toUpperCase();
-                const time = msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+                const isSelected = msg.id === state.currentMessageId;
+                const isUnread = !msg.seen;
+                const senderInitial = msg.from ? msg.from.charAt(0).toUpperCase() : '?';
 
                 return `
-                    <div onclick="openMessage('${msg.id}')" class="px-3 py-2.5 mx-1 my-1 rounded-xl cursor-pointer transition-colors ${isSelected ? 'bg-primary/10' : 'hover:bg-slate-100 dark:hover:bg-slate-800'} flex items-start gap-3">
-                        <div class="w-9 h-9 rounded-full flex items-center justify-center font-bold text-white text-sm ${isUnread ? 'bg-primary' : 'bg-slate-300 dark:bg-slate-700'}">${initial}</div>
-                        <div class="flex-1 min-w-0">
-                            <div class="flex justify-between gap-2">
-                                <span class="text-sm font-medium truncate ${isUnread ? 'text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-400'}">${from}</span>
-                                <span class="text-xs text-slate-400 flex-shrink-0">${time}</span>
+                    <div onclick="openMessage('${msg.id}')" class="group px-4 py-3 mx-2 my-1 rounded-2xl cursor-pointer transition-colors ${isSelected ? 'bg-m3-primaryContainer dark:bg-m3-darkPrimaryContainer' : 'hover:bg-slate-50 dark:hover:bg-white/5'} flex items-start gap-3">
+                        <div class="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center font-bold text-white ${isUnread ? 'bg-m3-primary dark:bg-m3-darkPrimary' : 'bg-slate-300 dark:bg-slate-700'}">
+                            ${senderInitial}
+                        </div>
+                        <div class="flex-1 min-w-0 pt-0.5">
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="font-medium text-sm truncate ${isUnread ? 'text-slate-900 dark:text-white' : 'text-slate-700 dark:text-slate-300'}">
+                                    ${msg.from || 'Unbekannt'}
+                                </span>
+                                <span class="text-xs text-slate-500 flex-shrink-0">${dateStr}</span>
                             </div>
-                            <div class="text-sm truncate ${isUnread ? 'font-medium' : 'text-slate-500'}">${msg.subject || '(Kein Betreff)'}</div>
+                            <h4 class="text-sm font-medium truncate ${isUnread ? 'text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-400'}">${msg.subject || '(Kein Betreff)'}</h4>
+                            <p class="text-xs text-slate-500 truncate mt-0.5">${msg.intro || ''}</p>
                         </div>
                     </div>
                 `;
@@ -432,27 +762,17 @@
         }
 
         // ============================================================
-        // 13. COPY
+        // 13. HELPER
         // ============================================================
-        async function copyEmail() {
-            if (!state.address) {
-                showToast('❌ Keine Adresse zum Kopieren', 'error');
-                return;
-            }
-            try {
-                await navigator.clipboard.writeText(state.address);
-                showToast('✅ Kopiert!');
-            } catch {
-                const ta = document.createElement('textarea');
-                ta.value = state.address;
-                ta.style.position = 'fixed';
-                ta.style.left = '-9999px';
-                document.body.appendChild(ta);
-                ta.select();
-                document.execCommand('copy');
-                document.body.removeChild(ta);
-                showToast('✅ Kopiert!');
-            }
+        function escapeHtml(text) {
+            if (!text) return '';
+            const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+            return text.replace(/[&<>"']/g, m => map[m]);
+        }
+
+        function escapeHtmlAttr(text) {
+            if (!text) return '';
+            return text.replace(/"/g, '&quot;');
         }
 
         // ============================================================
@@ -460,7 +780,8 @@
         // ============================================================
         setInterval(() => {
             state.countdown--;
-            document.getElementById('timerDisplay').textContent = state.countdown;
+            const timerEl = document.getElementById('countdownTimer');
+            if (timerEl) timerEl.textContent = `${state.countdown}s`;
             if (state.countdown <= 0) {
                 state.countdown = 10;
                 fetchMessages();
@@ -472,20 +793,13 @@
         // ============================================================
         window.onload = async function() {
             initTheme();
-            setStatus(false);
-            document.getElementById('apiInfo').textContent = 'Initialisiere...';
+            renderHistorySelect();
+            await fetchDomains();
 
-            // Prüfe ob vorhandene Session gültig ist
-            if (state.token && state.address) {
+            if (state.address) {
                 updateUI();
-                try {
-                    await fetchMessages();
-                } catch {
-                    // Wenn Fehler, neue Adresse
-                    await generateNewEmail();
-                }
+                await fetchMessages();
             } else {
-                // Neue Adresse erstellen
                 await generateNewEmail();
             }
         };
