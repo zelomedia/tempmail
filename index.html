@@ -37,7 +37,6 @@
     
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,1,0" rel="stylesheet" />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/1.4.19/Tone.js"></script>
     
     <style>
         body { font-family: 'Roboto', sans-serif; }
@@ -66,9 +65,6 @@
             </div>
         </div>
         <div class="flex items-center space-x-2">
-            <button id="soundToggleBtn" onclick="toggleSound()" class="w-10 h-10 rounded-full flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 transition text-slate-600 dark:text-slate-300">
-                <span id="soundIcon" class="material-symbols-outlined">notifications_off</span>
-            </button>
             <button onclick="toggleTheme()" class="w-10 h-10 rounded-full flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 transition text-slate-600 dark:text-slate-300">
                 <span id="themeIcon" class="material-symbols-outlined">light_mode</span>
             </button>
@@ -84,7 +80,7 @@
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-3">
                         <span class="text-sm font-medium text-m3-primary dark:text-m3-darkPrimary uppercase tracking-widest">Aktuelle Adresse</span>
-                        <span id="apiStatusBadge" class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">Live</span>
+                        <span id="apiStatusBadge" class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">✅ Live</span>
                     </div>
                     <div class="relative">
                         <select id="historySelect" onchange="switchAccount(this.value)" class="appearance-none bg-white/50 dark:bg-black/20 border border-slate-300 dark:border-slate-700 rounded-full px-4 py-1.5 pr-8 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-m3-primary cursor-pointer text-slate-700 dark:text-slate-300">
@@ -209,6 +205,9 @@
         // ============================================================
         const API_BASE = 'https://www.1secmail.com/api/v1/';
         const FALLBACK_DOMAINS = ['1secmail.com', '1secmail.org', '1secmail.net'];
+        
+        // BESSERER CORS-PROXY (funktioniert zuverlässiger)
+        const CORS_PROXY = 'https://corsproxy.io/?';
 
         // ============================================================
         // 2. STATE
@@ -229,28 +228,53 @@
         // 3. API HELPER (mit CORS-Proxy)
         // ============================================================
         async function apiFetch(params) {
-            const url = `${API_BASE}?${params}`;
-            console.log('[API] Fetch:', url);
+            // Direkt zur API (funktioniert nur manchmal)
+            const directUrl = `${API_BASE}?${params}`;
+            console.log('[API] Direct:', directUrl);
             
             try {
-                const res = await fetch(url);
+                const res = await fetch(directUrl);
                 if (res.ok) {
                     const data = await res.json();
-                    console.log('[API] ✅ Direct:', data);
+                    console.log('[API] ✅ Direct success:', data);
                     return data;
                 }
-                throw new Error(`HTTP ${res.status}`);
             } catch (e) {
-                console.warn('[API] Direct failed, trying proxy...', e);
-                const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+                console.warn('[API] Direct failed:', e.message);
+            }
+            
+            // CORS-Proxy (funktioniert zuverlässiger)
+            const proxyUrl = `${CORS_PROXY}${encodeURIComponent(directUrl)}`;
+            console.log('[API] Proxy:', proxyUrl);
+            
+            try {
                 const res = await fetch(proxyUrl);
                 if (res.ok) {
                     const data = await res.json();
-                    console.log('[API] ✅ Proxy:', data);
+                    console.log('[API] ✅ Proxy success:', data);
                     return data;
                 }
-                throw new Error(`Proxy failed: ${res.status}`);
+                console.warn('[API] Proxy failed:', res.status);
+            } catch (e) {
+                console.warn('[API] Proxy error:', e.message);
             }
+            
+            // Letzter Versuch: allorigins
+            const altProxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(directUrl)}`;
+            console.log('[API] Alt-Proxy:', altProxy);
+            
+            try {
+                const res = await fetch(altProxy);
+                if (res.ok) {
+                    const data = await res.json();
+                    console.log('[API] ✅ Alt-Proxy success:', data);
+                    return data;
+                }
+            } catch (e) {
+                console.warn('[API] Alt-Proxy failed:', e.message);
+            }
+            
+            return null;
         }
 
         // ============================================================
@@ -278,7 +302,7 @@
         }
 
         // ============================================================
-        // 5. THEME & SOUND
+        // 5. THEME
         // ============================================================
         function initTheme() {
             const isDark = localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches);
@@ -289,7 +313,6 @@
                 document.documentElement.classList.remove('dark');
                 document.getElementById('themeIcon').textContent = 'light_mode';
             }
-            updateSoundIcon();
         }
 
         function toggleTheme() {
@@ -297,44 +320,6 @@
             const isDark = document.documentElement.classList.contains('dark');
             localStorage.theme = isDark ? 'dark' : 'light';
             document.getElementById('themeIcon').textContent = isDark ? 'dark_mode' : 'light_mode';
-        }
-
-        function updateSoundIcon() {
-            document.getElementById('soundIcon').textContent = state.soundEnabled ? 'notifications_active' : 'notifications_off';
-            const btn = document.getElementById('soundToggleBtn');
-            if (state.soundEnabled) {
-                btn.classList.add('text-m3-primary', 'dark:text-m3-darkPrimary');
-            } else {
-                btn.classList.remove('text-m3-primary', 'dark:text-m3-darkPrimary');
-            }
-        }
-
-        async function toggleSound() {
-            state.soundEnabled = !state.soundEnabled;
-            localStorage.setItem('pm_sound', state.soundEnabled);
-            updateSoundIcon();
-            if (state.soundEnabled) {
-                await Tone.start();
-                playNotificationSound();
-                showToast('🔊 Audio-Benachrichtigungen aktiviert');
-            } else {
-                showToast('🔇 Audio stummgeschaltet');
-            }
-        }
-
-        function playNotificationSound() {
-            if (!state.soundEnabled) return;
-            try {
-                const synth = new Tone.PolySynth(Tone.Synth, {
-                    oscillator: { type: "sine" },
-                    envelope: { attack: 0.01, decay: 0.1, sustain: 0.1, release: 1 }
-                }).toDestination();
-                const now = Tone.now();
-                synth.triggerAttackRelease(["C5", "E5"], "16n", now);
-                synth.triggerAttackRelease("G5", "16n", now + 0.15);
-            } catch (e) {
-                console.warn('Sound failed', e);
-            }
         }
 
         // ============================================================
@@ -399,7 +384,7 @@
         }
 
         // ============================================================
-        // 7. E-MAIL GENERIEREN & WILLKOMMENSNACHRICHT
+        // 7. E-MAIL GENERIEREN
         // ============================================================
         async function setupAccount(address) {
             if (state.address === address) return;
@@ -411,7 +396,7 @@
             state.currentMessageId = null;
             updateUI();
             
-            // Willkommensnachricht anzeigen (nur beim ersten Mal)
+            // Willkommensnachricht
             if (!state.isMockMode && !state.isInitialized) {
                 addWelcomeMessage();
             }
@@ -432,7 +417,6 @@
             };
             state.messages = [welcomeMsg, ...state.messages];
             renderMessagesList();
-            playNotificationSound();
             showToast('📩 Willkommensnachricht erhalten');
         }
 
@@ -441,6 +425,7 @@
                 if (state.domains.length === 0) await fetchDomains();
                 const domain = state.domains[Math.floor(Math.random() * state.domains.length)];
                 
+                // Versuche, eine zufällige Adresse von der API zu bekommen
                 const data = await apiFetch('action=genRandomMailbox&count=1');
                 if (data && Array.isArray(data) && data.length > 0) {
                     await setupAccount(data[0]);
@@ -448,6 +433,7 @@
                     return;
                 }
                 
+                // Fallback: manuelle Generierung
                 const randomStr = Math.random().toString(36).substring(2, 10);
                 const address = `proxy_${randomStr}@${domain}`;
                 await setupAccount(address);
@@ -607,7 +593,6 @@
                     state.messages = mapped;
                     
                     if (mapped.length > oldCount) {
-                        playNotificationSound();
                         showToast(`📩 ${mapped.length - oldCount} neue Nachricht(en)`);
                     }
                     renderMessagesList();
@@ -619,6 +604,7 @@
                 }
             } catch (err) {
                 console.error('[fetchMessages] FEHLER:', err);
+                // Im Fehlerfall nichts tun
             } finally {
                 if (spinner) spinner.classList.remove('animate-spin');
             }
