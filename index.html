@@ -251,22 +251,35 @@
 
     <!-- JavaScript Application Logic -->
     <script>
-        const API_BASE = 'https://api.mail.tm';
-        const FALLBACK_DOMAINS = [{ domain: 'mail.tm' }, { domain: 'mail.gw' }, { domain: 'emailn.de' }];
+        const API_BASE = 'https://www.1secmail.com/api/v1/';
+        const FALLBACK_DOMAINS = ['1secmail.com', '1secmail.org', '1secmail.net'];
         
         let state = {
-            token: localStorage.getItem('pm_token') || null,
             address: localStorage.getItem('pm_address') || null,
-            id: localStorage.getItem('pm_id') || null,
-            password: localStorage.getItem('pm_password') || null,
-            isMockMode: localStorage.getItem('pm_mock_mode') === 'true',
             domains: [],
             history: JSON.parse(localStorage.getItem('pm_history') || '[]'),
-            messages: JSON.parse(localStorage.getItem('pm_mock_messages') || '[]'),
+            messages: [],
             currentMessageId: null,
             countdown: 10,
-            soundEnabled: localStorage.getItem('pm_sound') === 'true'
+            soundEnabled: localStorage.getItem('pm_sound') === 'true',
+            isMockMode: false // We try to avoid mock mode with 1secmail
         };
+
+        // API Helper for CORS bypass
+        async function apiFetch(queryParams) {
+            const url = `${API_BASE}?${queryParams}&_=${Date.now()}`;
+            try {
+                const res = await fetch(url);
+                if (res.ok) return await res.json();
+                throw new Error(`HTTP ${res.status}`);
+            } catch (e) {
+                console.warn('Direct connection failed, trying CORS proxy...', e);
+                const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+                const res = await fetch(proxyUrl);
+                if (res.ok) return await res.json();
+                throw new Error(`Proxy HTTP ${res.status}`);
+            }
+        }
 
         // UI Helpers
         function showToast(message, type = 'success') {
@@ -355,11 +368,12 @@
             }
         }
 
-        function addToHistory(accountData) {
+        function addToHistory(address) {
+            if (!address) return;
             // Remove if already exists to move it to top
-            state.history = state.history.filter(h => h.address !== accountData.address);
+            state.history = state.history.filter(h => h !== address);
             
-            state.history.unshift(accountData);
+            state.history.unshift(address);
             if (state.history.length > 5) state.history.pop(); // Keep last 5
             
             localStorage.setItem('pm_history', JSON.stringify(state.history));
@@ -377,35 +391,26 @@
             select.nextElementSibling.classList.remove('hidden');
             
             let options = '<option value="">Verlauf (Letzte 5)</option>';
-            state.history.forEach((h, index) => {
-                const isCurrent = h.address === state.address;
-                options += `<option value="${index}" ${isCurrent ? 'disabled' : ''}>${h.address} ${isCurrent ? '(Aktiv)' : ''}</option>`;
+            state.history.forEach((addr, index) => {
+                const isCurrent = addr === state.address;
+                options += `<option value="${index}" ${isCurrent ? 'disabled' : ''}>${addr} ${isCurrent ? '(Aktiv)' : ''}</option>`;
             });
             select.innerHTML = options;
         }
 
         async function switchAccount(historyIndex) {
             if (historyIndex === "") return;
-            const account = state.history[parseInt(historyIndex)];
-            if (!account) return;
+            const address = state.history[parseInt(historyIndex)];
+            if (!address) return;
 
-            state.token = account.token;
-            state.address = account.address;
-            state.id = account.id;
-            state.password = account.password;
-            
-            localStorage.setItem('pm_token', state.token);
+            state.address = address;
             localStorage.setItem('pm_address', state.address);
-            localStorage.setItem('pm_id', state.id);
-            localStorage.setItem('pm_password', state.password);
             
             // Re-arrange history so active is top
-            addToHistory(account);
+            addToHistory(address);
             
-            // If switching to mock address, ensure mock mode is on
             state.isMockMode = state.address.includes('demo_');
-            localStorage.setItem('pm_mock_mode', state.isMockMode);
-
+            
             // Reset UI
             state.messages = [];
             state.currentMessageId = null;
@@ -477,136 +482,77 @@
 
         async function fetchDomains() {
             try {
-                const res = await fetch(`${API_BASE}/domains`);
-                if (!res.ok) throw new Error('Network error');
-                const data = await res.json();
-                state.domains = data['hydra:member'] || FALLBACK_DOMAINS;
+                state.domains = await apiFetch('action=getDomainList');
             } catch (err) {
                 state.domains = FALLBACK_DOMAINS;
             } finally {
                 const select = document.getElementById('customDomainSelect');
                 if (select) {
-                    select.innerHTML = state.domains.map(d => `<option value="${d.domain}">${d.domain}</option>`).join('');
+                    select.innerHTML = state.domains.map(d => `<option value="${d}">${d}</option>`).join('');
                 }
             }
         }
 
-        async function createAndAuthenticateAccount(address, password) {
-            if (state.isMockMode) {
-                const accountData = {
-                    address: address,
-                    token: 'mock_token_' + Date.now(),
-                    id: 'mock_id_' + Date.now(),
-                    password: password
-                };
-                Object.assign(state, accountData);
-                
-                localStorage.setItem('pm_token', state.token);
-                localStorage.setItem('pm_address', state.address);
-                localStorage.setItem('pm_id', state.id);
-                localStorage.setItem('pm_password', state.password);
-                
-                addToHistory(accountData);
-                updateUI();
-                fetchMessages();
-                return;
-            }
-
-            try {
-                // 1. Create
-                const createRes = await fetch(`${API_BASE}/accounts`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ address, password })
-                });
-
-                if (!createRes.ok) {
-                    const err = await createRes.json().catch(() => ({}));
-                    throw new Error(err.detail || 'Erstellung fehlgeschlagen');
-                }
-
-                // 2. Token
-                const tokenRes = await fetch(`${API_BASE}/token`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ address, password })
-                });
-
-                if (!tokenRes.ok) throw new Error('Auth fehlgeschlagen');
-                const tokenData = await tokenRes.json();
-
-                const accountData = {
-                    address: address,
-                    token: tokenData.token,
-                    id: tokenData.id,
-                    password: password
-                };
-                Object.assign(state, accountData);
-                
-                localStorage.setItem('pm_token', state.token);
-                localStorage.setItem('pm_address', state.address);
-                localStorage.setItem('pm_id', state.id);
-                localStorage.setItem('pm_password', state.password);
-
-                addToHistory(accountData);
-                state.isMockMode = false;
-                localStorage.setItem('pm_mock_mode', 'false');
-                state.messages = []; // Clear inbox for new address
-                
-                updateUI();
-                fetchMessages();
-            } catch (err) {
-                throw err; // Pass error up
-            }
+        async function setupAccount(address) {
+             if (state.address === address) return;
+             
+             state.address = address;
+             localStorage.setItem('pm_address', state.address);
+             addToHistory(address);
+             
+             state.isMockMode = address.startsWith('demo_');
+             state.messages = [];
+             
+             updateUI();
+             await fetchMessages();
         }
 
         async function generateNewEmail() {
             try {
                 if (state.domains.length === 0) await fetchDomains();
-                const domain = state.domains[Math.floor(Math.random() * state.domains.length)].domain;
-                const randomStr = Math.random().toString(36).substring(2, 10);
-                const address = `proxy_${randomStr}@${domain}`;
-                const password = Math.random().toString(36).slice(-12) + 'A1!';
-
-                // Try real API first
-                try {
-                    await createAndAuthenticateAccount(address, password);
-                } catch(apiErr) {
-                    // Force Mock Mode if blocked
-                    state.isMockMode = true;
-                    localStorage.setItem('pm_mock_mode', 'true');
-                    const mockAddr = `demo_${randomStr}@${domain}`;
-                    await createAndAuthenticateAccount(mockAddr, password);
-                    addMockWelcomeMessage();
-                    showToast('Offline-Demo-Modus aktiv');
+                const domain = state.domains[Math.floor(Math.random() * state.domains.length)];
+                
+                // 1secmail provides a random address generator endpoint
+                const data = await apiFetch('action=genRandomMailbox&count=1');
+                if(data && data.length > 0) {
+                    await setupAccount(data[0]);
+                    showToast('Neue Adresse generiert');
                     return;
                 }
                 
+                // Fallback manual generation if API gen fails
+                const randomStr = Math.random().toString(36).substring(2, 10);
+                const address = `proxy_${randomStr}@${domain}`;
+                await setupAccount(address);
                 showToast('Neue Adresse generiert');
                 
             } catch (err) {
-                showToast('Fehler bei Generierung', 'error');
+                // Absolute fallback to mock if everything fails
+                console.error("API error", err);
+                const domain = state.domains[0] || '1secmail.com';
+                const randomStr = Math.random().toString(36).substring(2, 10);
+                await setupAccount(`demo_${randomStr}@${domain}`);
+                addMockWelcomeMessage();
+                showToast('Offline-Demo-Modus aktiv', 'error');
             }
         }
 
         function addMockWelcomeMessage() {
             const welcomeMsg = {
                 id: 'mock_msg_' + Date.now(),
-                from: { name: 'ProxyMail Team', address: 'hello@proxymail.local' },
+                from: 'hello@proxymail.local',
                 subject: 'Willkommen bei ProxyMail! 🎉',
+                date: new Date().toISOString().replace('T', ' ').substring(0, 19),
                 intro: 'Ihre sichere, temporäre Adresse ist bereit.',
-                text: 'Hallo!\n\nIhre temporäre E-Mail-Adresse ist einsatzbereit. Eingehende Mails erscheinen hier.\n\nIm Mock-Modus wird das Senden simuliert.',
-                createdAt: new Date().toISOString(),
                 seen: false
             };
-            state.messages = [welcomeMsg, ...state.messages];
-            localStorage.setItem('pm_mock_messages', JSON.stringify(state.messages));
+            state.messages = [welcomeMsg];
             renderMessagesList();
             playNotificationSound();
         }
 
         async function fetchMessages() {
-            if (!state.token) return;
+            if (!state.address) return;
 
             const oldMsgCount = state.messages.length;
             const spinner = document.getElementById('refreshSpinner');
@@ -621,28 +567,28 @@
             }
 
             try {
-                const res = await fetch(`${API_BASE}/messages`, {
-                    headers: { 'Authorization': `Bearer ${state.token}` }
+                const [login, domain] = state.address.split('@');
+                const newMessages = await apiFetch(`action=getMessages&login=${login}&domain=${domain}`);
+                
+                // 1secmail doesn't keep 'seen' state, we manage it locally based on IDs
+                const mappedMessages = newMessages.map(msg => {
+                    const existingMsg = state.messages.find(m => m.id === msg.id);
+                    return {
+                        ...msg,
+                        intro: msg.subject, // 1secmail doesn't give snippet in list
+                        seen: existingMsg ? existingMsg.seen : false
+                    };
                 });
 
-                if (res.status === 401) {
-                    generateNewEmail();
-                    return;
-                }
-
-                if (!res.ok) throw new Error('API Error');
-                const data = await res.json();
+                state.messages = mappedMessages;
                 
-                const newMessages = data['hydra:member'] || [];
-                state.messages = newMessages;
-                
-                if (newMessages.length > oldMsgCount) {
+                if (mappedMessages.length > oldMsgCount) {
                     playNotificationSound();
                 }
 
                 renderMessagesList();
             } catch (err) {
-                console.warn('API fetch failed, retaining existing messages');
+                console.warn('API fetch failed', err);
             } finally {
                 if(spinner) spinner.classList.remove('animate-spin');
             }
@@ -665,25 +611,30 @@
             }
 
             listEl.innerHTML = state.messages.map(msg => {
-                const date = new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                // 1secmail date format is 'YYYY-MM-DD HH:MM:SS'
+                let dateStr = msg.date;
+                try {
+                    const d = new Date(msg.date.replace(' ', 'T'));
+                    dateStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                } catch(e) {}
+                
                 const isSelected = msg.id === state.currentMessageId;
                 const isUnread = !msg.seen;
+                const senderInitial = msg.from ? msg.from.charAt(0).toUpperCase() : '?';
                 
-                // Material List Item
                 return `
                     <div onclick="openMessage('${msg.id}')" class="group px-4 py-3 mx-2 my-1 rounded-2xl cursor-pointer transition-colors ${isSelected ? 'bg-m3-primaryContainer dark:bg-m3-darkPrimaryContainer' : 'hover:bg-slate-50 dark:hover:bg-white/5'} flex items-start gap-3">
                         <div class="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center font-bold text-white ${isUnread ? 'bg-m3-primary dark:bg-m3-darkPrimary' : 'bg-slate-300 dark:bg-slate-700'}">
-                            ${(msg.from.name || msg.from.address).charAt(0).toUpperCase()}
+                            ${senderInitial}
                         </div>
                         <div class="flex-1 min-w-0 pt-0.5">
                             <div class="flex items-center justify-between gap-2">
                                 <span class="font-medium text-sm truncate ${isUnread ? 'text-slate-900 dark:text-white' : 'text-slate-700 dark:text-slate-300'}">
-                                    ${msg.from.name || msg.from.address}
+                                    ${msg.from || 'Unbekannt'}
                                 </span>
-                                <span class="text-xs text-slate-500 flex-shrink-0">${date}</span>
+                                <span class="text-xs text-slate-500 flex-shrink-0">${dateStr}</span>
                             </div>
                             <h4 class="text-sm font-medium truncate ${isUnread ? 'text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-400'}">${msg.subject || '(Kein Betreff)'}</h4>
-                            <p class="text-xs text-slate-500 truncate mt-0.5">${msg.intro || ''}</p>
                         </div>
                     </div>
                 `;
@@ -692,6 +643,12 @@
 
         async function openMessage(id) {
             state.currentMessageId = id;
+            
+            // Mark as seen locally
+            const targetMsgIndex = state.messages.findIndex(m => m.id == id);
+            if (targetMsgIndex !== -1) {
+                state.messages[targetMsgIndex].seen = true;
+            }
             renderMessagesList();
 
             const detailEl = document.getElementById('messageDetail');
@@ -702,67 +659,79 @@
             `;
 
             try {
-                let msg;
-                if (state.isMockMode) {
-                    msg = state.messages.find(m => m.id === id);
-                    if (!msg) throw new Error('Not found');
+                let msgData;
+                
+                if (state.isMockMode && id.toString().startsWith('mock_')) {
+                     msgData = {
+                         id: id,
+                         from: 'hello@proxymail.local',
+                         subject: 'Willkommen bei ProxyMail! 🎉',
+                         date: new Date().toISOString(),
+                         textBody: 'Hallo!\n\nIhre temporäre E-Mail-Adresse ist einsatzbereit. Eingehende Mails erscheinen hier.\n\nIm Mock-Modus wird das Senden simuliert.',
+                         htmlBody: ''
+                     };
                 } else {
-                    const res = await fetch(`${API_BASE}/messages/${id}`, {
-                        headers: { 'Authorization': `Bearer ${state.token}` }
-                    });
-                    if (!res.ok) throw new Error('Load failed');
-                    msg = await res.json();
+                    const [login, domain] = state.address.split('@');
+                    msgData = await apiFetch(`action=readMessage&login=${login}&domain=${domain}&id=${id}`);
                 }
 
-                const fullDate = new Date(msg.createdAt).toLocaleString();
-                const contentText = msg.text || 'Kein Textinhalt.';
-                
                 // Store text for download
-                window.currentMessageText = `Von: ${msg.from.address}\nDatum: ${fullDate}\nBetreff: ${msg.subject}\n\n${contentText}`;
+                window.currentMessageText = `Von: ${msgData.from}\nDatum: ${msgData.date}\nBetreff: ${msgData.subject}\n\n${msgData.textBody || ''}`;
+
+                const senderInitial = msgData.from ? msgData.from.charAt(0).toUpperCase() : '?';
+                
+                // 1secmail attachments handling (basic list)
+                let attachmentsHtml = '';
+                if(msgData.attachments && msgData.attachments.length > 0) {
+                    const [login, domain] = state.address.split('@');
+                    attachmentsHtml = `
+                        <div class="mt-4 p-4 bg-white dark:bg-m3-darkSurface rounded-xl border border-slate-200 dark:border-slate-700">
+                            <h4 class="text-sm font-medium mb-2 flex items-center gap-1"><span class="material-symbols-outlined text-[18px]">attachment</span> Anhänge</h4>
+                            <div class="flex flex-wrap gap-2">
+                                ${msgData.attachments.map(att => `
+                                    <a href="${API_BASE}?action=download&login=${login}&domain=${domain}&id=${id}&file=${att.filename}" target="_blank" class="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-xs font-medium transition truncate max-w-[200px]">
+                                        ${att.filename}
+                                    </a>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
 
                 detailEl.innerHTML = `
                     <!-- Message Header -->
                     <div class="p-6 border-b border-slate-100 dark:border-slate-800">
                         <div class="flex justify-between items-start mb-4">
-                            <h2 class="text-2xl font-medium text-slate-900 dark:text-white">${msg.subject || '(Kein Betreff)'}</h2>
+                            <h2 class="text-2xl font-medium text-slate-900 dark:text-white">${msgData.subject || '(Kein Betreff)'}</h2>
                             <div class="flex gap-1 ml-4">
                                 <button onclick="downloadMessage()" title="Als Text speichern" class="w-10 h-10 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center transition text-slate-600 dark:text-slate-300">
                                     <span class="material-symbols-outlined text-[20px]">download</span>
-                                </button>
-                                <button onclick="deleteMessage('${msg.id}')" title="Löschen" class="w-10 h-10 rounded-full hover:bg-red-50 dark:hover:bg-red-900/30 flex items-center justify-center transition text-red-600 dark:text-red-400">
-                                    <span class="material-symbols-outlined text-[20px]">delete</span>
                                 </button>
                             </div>
                         </div>
                         <div class="flex items-center gap-3">
                             <div class="w-12 h-12 rounded-full bg-m3-primaryContainer dark:bg-m3-darkPrimaryContainer flex items-center justify-center text-m3-onPrimaryContainer font-bold text-lg">
-                                ${(msg.from.name || msg.from.address).charAt(0).toUpperCase()}
+                                ${senderInitial}
                             </div>
                             <div class="text-sm">
-                                <div class="font-medium text-slate-900 dark:text-white">${msg.from.name ? `${msg.from.name} <span class="text-slate-500 font-normal">&lt;${msg.from.address}&gt;</span>` : msg.from.address}</div>
-                                <div class="text-slate-500 text-xs mt-0.5">An: ${state.address} • ${fullDate}</div>
+                                <div class="font-medium text-slate-900 dark:text-white">${msgData.from}</div>
+                                <div class="text-slate-500 text-xs mt-0.5">An: ${state.address} • ${msgData.date}</div>
                             </div>
                         </div>
                     </div>
 
                     <!-- Message Body -->
-                    <div class="p-6 flex-1 overflow-y-auto bg-slate-50/50 dark:bg-black/10">
-                        ${msg.html ? 
-                            `<iframe class="w-full h-full min-h-[400px] bg-white rounded-xl border border-slate-200 dark:border-transparent" srcdoc="${escapeHtmlAttr(msg.html)}"></iframe>` :
-                            `<div class="whitespace-pre-wrap font-sans text-sm text-slate-800 dark:text-slate-200">${escapeHtml(msg.text || '')}</div>`
+                    <div class="p-6 flex-1 overflow-y-auto bg-slate-50/50 dark:bg-black/10 flex flex-col">
+                        ${msgData.htmlBody ? 
+                            `<iframe class="w-full flex-1 min-h-[400px] bg-white rounded-xl border border-slate-200 dark:border-transparent" srcdoc="${escapeHtmlAttr(msgData.htmlBody)}"></iframe>` :
+                            `<div class="whitespace-pre-wrap font-sans text-sm text-slate-800 dark:text-slate-200 flex-1">${escapeHtml(msgData.textBody || '')}</div>`
                         }
+                        ${attachmentsHtml}
                     </div>
                 `;
 
-                // Mark seen
-                const targetMsg = state.messages.find(m => m.id === id);
-                if (targetMsg) targetMsg.seen = true;
-                if (state.isMockMode) {
-                    localStorage.setItem('pm_mock_messages', JSON.stringify(state.messages));
-                }
-                renderMessagesList();
-
             } catch (err) {
+                console.error(err);
                 detailEl.innerHTML = `<div class="p-8 text-center text-red-500">Nachricht konnte nicht geladen werden.</div>`;
             }
         }
@@ -808,22 +777,13 @@
 
         async function deleteAllMessages() {
             if (state.messages.length === 0) return;
-            if (!confirm('Alle E-Mails löschen?')) return;
+            if (!confirm('Alle lokalen E-Mails ausblenden? (Bei 1secmail werden sie automatisch vom Server gelöscht)')) return;
             
-            if (!state.isMockMode) {
-                for (const msg of state.messages) {
-                    await fetch(`${API_BASE}/messages/${msg.id}`, {
-                        method: 'DELETE',
-                        headers: { 'Authorization': `Bearer ${state.token}` }
-                    }).catch(() => {});
-                }
-            }
             state.messages = [];
-            if (state.isMockMode) localStorage.setItem('pm_mock_messages', '[]');
             state.currentMessageId = null;
             document.getElementById('messageDetail').innerHTML = `<div class="flex flex-col items-center justify-center h-full"><span class="material-symbols-outlined text-[64px] text-slate-200 dark:text-slate-700">mail</span></div>`;
             renderMessagesList();
-            showToast('Alle gelöscht');
+            showToast('Alle ausgeblendet');
         }
 
         // Custom Modal
@@ -851,19 +811,13 @@
             const username = document.getElementById('customUsername').value.trim();
             const domain = document.getElementById('customDomainSelect').value;
             const address = `${username}@${domain}`;
-            const password = Math.random().toString(36).slice(-10) + 'A1!';
 
             try {
-                await createAndAuthenticateAccount(address, password);
+                await setupAccount(address);
                 closeCustomModal();
                 showToast(`Wunschadresse erstellt!`);
             } catch (err) {
-                showToast('Name vergeben oder Fehler', 'error');
-                // fallback to mock for demo
-                state.isMockMode = true;
-                await createAndAuthenticateAccount('demo_'+address, password);
-                closeCustomModal();
-                showToast('Als Mock-Adresse erstellt');
+                showToast('Fehler beim Erstellen', 'error');
             }
         }
 
@@ -879,13 +833,16 @@
             if (badge) {
                 badge.classList.remove('hidden', 'bg-green-100', 'text-green-700', 'bg-red-100', 'text-red-700', 'dark:bg-green-900', 'dark:text-green-300', 'dark:bg-red-900', 'dark:text-red-300');
                 if (state.isMockMode) {
-                    badge.textContent = 'Demo-Modus (Kein Empfang)';
+                    badge.textContent = 'Demo-Modus';
                     badge.classList.add('bg-red-100', 'text-red-700', 'dark:bg-red-900', 'dark:text-red-300');
                 } else {
-                    badge.textContent = 'Live';
+                    badge.textContent = 'Live (1secmail)';
                     badge.classList.add('bg-green-100', 'text-green-700', 'dark:bg-green-900', 'dark:text-green-300');
                 }
             }
+            
+            // Remove delete single message button as 1secmail API doesn't support it
+            // We hide it in the UI when viewing a message
         }
 
         function escapeHtml(text) {
@@ -911,7 +868,12 @@
             renderHistorySelect();
             await fetchDomains();
             
-            if (state.token && state.address) {
+            if (state.address) {
+                // Remove old tokens if they exist from previous version
+                localStorage.removeItem('pm_token');
+                localStorage.removeItem('pm_password');
+                localStorage.removeItem('pm_id');
+                
                 updateUI();
                 fetchMessages();
             } else {
