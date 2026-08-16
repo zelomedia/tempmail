@@ -97,7 +97,10 @@
             
             <div class="flex-1 space-y-3 z-10 w-full">
                 <div class="flex items-center justify-between">
-                    <span class="text-sm font-medium text-m3-primary dark:text-m3-darkPrimary uppercase tracking-widest">Aktuelle Adresse</span>
+                    <div class="flex items-center gap-3">
+                        <span class="text-sm font-medium text-m3-primary dark:text-m3-darkPrimary uppercase tracking-widest">Aktuelle Adresse</span>
+                        <span id="apiStatusBadge" class="hidden px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider">Status</span>
+                    </div>
                     
                     <!-- Account History Select -->
                     <div class="relative">
@@ -414,19 +417,38 @@
         }
 
         // Copy / QR Features
-        function copyEmail() {
+        async function copyEmail() {
             if (!state.address) return;
-            const textArea = document.createElement('textarea');
-            textArea.value = state.address;
-            document.body.appendChild(textArea);
-            textArea.select();
             try {
-                document.execCommand('copy');
+                await navigator.clipboard.writeText(state.address);
                 showToast('E-Mail-Adresse kopiert!');
             } catch (err) {
-                showToast('Konnte Adresse nicht kopieren', 'error');
+                // Fallback for older browsers or non-HTTPS
+                const textArea = document.createElement('textarea');
+                textArea.value = state.address;
+                
+                // Avoid scrolling to bottom
+                textArea.style.top = "0";
+                textArea.style.left = "0";
+                textArea.style.position = "fixed";
+                
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                
+                try {
+                    const successful = document.execCommand('copy');
+                    if (successful) {
+                        showToast('E-Mail-Adresse kopiert!');
+                    } else {
+                        showToast('Konnte Adresse nicht kopieren', 'error');
+                    }
+                } catch (err) {
+                    showToast('Fehler beim Kopieren', 'error');
+                }
+                
+                document.body.removeChild(textArea);
             }
-            document.body.removeChild(textArea);
         }
 
         function showQRCode() {
