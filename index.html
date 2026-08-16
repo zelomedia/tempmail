@@ -205,18 +205,20 @@
 
     <script>
         // ============================================================
-        // 1. API KONFIGURATION (MIT CORS-PROXY!)
+        // 1. API KONFIGURATION (mail.tm - funktioniert zuverlässig)
         // ============================================================
-        const API_BASE = 'https://www.1secmail.com/api/v1/';
-        const CORS_PROXY = 'https://corsproxy.io/?';
-        const DOMAINS = ['1secmail.com', '1secmail.org', '1secmail.net'];
+        const API_BASE = 'https://api.mail.tm';
+        const DOMAINS = ['mail.tm', 'mail.gw', 'emailn.de'];
 
         // ============================================================
         // 2. STATE
         // ============================================================
         let state = {
+            token: localStorage.getItem('pm_token') || null,
             address: localStorage.getItem('pm_address') || null,
-            domains: DOMAINS,
+            id: localStorage.getItem('pm_id') || null,
+            password: localStorage.getItem('pm_password') || null,
+            domains: [],
             history: JSON.parse(localStorage.getItem('pm_history') || '[]'),
             messages: [],
             currentMessageId: null,
@@ -226,31 +228,7 @@
         };
 
         // ============================================================
-        // 3. API HELPER (MIT CORS-PROXY)
-        // ============================================================
-        async function callApi(params) {
-            const url = `${API_BASE}?${params}`;
-            const proxyUrl = `${CORS_PROXY}${encodeURIComponent(url)}`;
-            console.log('[API] Proxy:', proxyUrl);
-
-            try {
-                const res = await fetch(proxyUrl);
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const data = await res.json();
-                console.log('[API] ✅', data);
-                state.isLive = true;
-                updateStatusBadge();
-                return data;
-            } catch (err) {
-                console.error('[API] ❌', err);
-                state.isLive = false;
-                updateStatusBadge();
-                return null;
-            }
-        }
-
-        // ============================================================
-        // 4. UI HELPER
+        // 3. UI HELPER
         // ============================================================
         function showToast(message, type = 'success') {
             const container = document.getElementById('toastContainer');
@@ -284,7 +262,7 @@
         }
 
         // ============================================================
-        // 5. THEME
+        // 4. THEME
         // ============================================================
         function initTheme() {
             const isDark = localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches);
@@ -306,7 +284,7 @@
         }
 
         // ============================================================
-        // 6. SOUND
+        // 5. SOUND
         // ============================================================
         function updateSoundIcon() {
             const icon = document.getElementById('soundIcon');
@@ -346,7 +324,7 @@
         }
 
         // ============================================================
-        // 7. ACCOUNT MANAGEMENT
+        // 6. ACCOUNT MANAGEMENT
         // ============================================================
         function addToHistory(address) {
             if (!address) return;
@@ -378,6 +356,18 @@
             if (historyIndex === "") return;
             const address = state.history[parseInt(historyIndex)];
             if (!address) return;
+
+            // Finde die zugehörigen Credentials
+            const account = state.history_accounts ? state.history_accounts.find(a => a.address === address) : null;
+            if (account) {
+                state.token = account.token;
+                state.id = account.id;
+                state.password = account.password;
+                localStorage.setItem('pm_token', state.token);
+                localStorage.setItem('pm_id', state.id);
+                localStorage.setItem('pm_password', state.password);
+            }
+
             state.address = address;
             localStorage.setItem('pm_address', state.address);
             addToHistory(address);
@@ -398,29 +388,70 @@
         }
 
         // ============================================================
-        // 8. E-MAIL GENERIEREN & WILLKOMMENSNACHRICHT
+        // 7. E-MAIL GENERIEREN (mail.tm)
         // ============================================================
-        async function setupAccount(address) {
-            if (state.address === address) return;
-            state.address = address;
-            localStorage.setItem('pm_address', state.address);
-            addToHistory(address);
-            state.messages = [];
-            state.currentMessageId = null;
-            updateUI();
+        async function createAndAuthenticateAccount(address, password) {
+            try {
+                // 1. Account erstellen
+                const createRes = await fetch(`${API_BASE}/accounts`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ address, password })
+                });
 
-            // Willkommensnachricht – NUR wenn noch keine Nachrichten vorhanden
-            if (state.messages.length === 0 && !state.address.startsWith('demo_')) {
+                if (!createRes.ok) {
+                    const err = await createRes.json().catch(() => ({}));
+                    throw new Error(err.detail || 'Erstellung fehlgeschlagen');
+                }
+
+                // 2. Token holen
+                const tokenRes = await fetch(`${API_BASE}/token`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ address, password })
+                });
+
+                if (!tokenRes.ok) throw new Error('Auth fehlgeschlagen');
+                const tokenData = await tokenRes.json();
+
+                state.token = tokenData.token;
+                state.address = address;
+                state.id = tokenData.id;
+                state.password = password;
+                state.isLive = true;
+
+                localStorage.setItem('pm_token', state.token);
+                localStorage.setItem('pm_address', state.address);
+                localStorage.setItem('pm_id', state.id);
+                localStorage.setItem('pm_password', state.password);
+
+                // In History speichern (mit Credentials)
+                if (!state.history_accounts) state.history_accounts = [];
+                state.history_accounts = state.history_accounts.filter(a => a.address !== address);
+                state.history_accounts.unshift({ address, token: state.token, id: state.id, password: state.password });
+                if (state.history_accounts.length > 5) state.history_accounts.pop();
+                localStorage.setItem('pm_history_accounts', JSON.stringify(state.history_accounts));
+
+                addToHistory(address);
+                updateUI();
+
+                // Willkommensnachricht
                 addWelcomeMessage();
-            }
 
-            await fetchMessages();
+                await fetchMessages();
+                return true;
+            } catch (err) {
+                console.error('[ERROR] createAndAuthenticateAccount:', err);
+                state.isLive = false;
+                updateStatusBadge();
+                return false;
+            }
         }
 
         function addWelcomeMessage() {
             const welcome = {
                 id: 'welcome_' + Date.now(),
-                from: 'ProxyMail Team',
+                from: 'ProxyMail Team <hello@proxymail.local>',
                 subject: '🎉 Willkommen bei ProxyMail!',
                 date: new Date().toISOString().replace('T', ' ').substring(0, 19),
                 intro: 'Deine temporäre E-Mail-Adresse ist bereit.',
@@ -435,19 +466,18 @@
 
         async function generateNewEmail() {
             try {
-                const domain = DOMAINS[Math.floor(Math.random() * DOMAINS.length)];
-                const data = await callApi('action=genRandomMailbox&count=1');
-
-                if (data && Array.isArray(data) && data.length > 0) {
-                    await setupAccount(data[0]);
-                    showToast('✅ Neue Adresse generiert');
-                    return;
-                }
-
-                // Fallback: manuelle Generierung
+                if (state.domains.length === 0) await fetchDomains();
+                const domain = state.domains[Math.floor(Math.random() * state.domains.length)];
                 const randomStr = Math.random().toString(36).substring(2, 10);
-                await setupAccount(`proxy_${randomStr}@${domain}`);
-                showToast('✅ Neue Adresse generiert');
+                const address = `proxy_${randomStr}@${domain}`;
+                const password = Math.random().toString(36).slice(-12) + 'A1!';
+
+                const success = await createAndAuthenticateAccount(address, password);
+                if (success) {
+                    showToast('✅ Neue Adresse generiert');
+                } else {
+                    showToast('❌ Fehler bei Generierung', 'error');
+                }
             } catch (err) {
                 console.error(err);
                 showToast('❌ Fehler bei Generierung', 'error');
@@ -455,16 +485,16 @@
         }
 
         // ============================================================
-        // 9. DOMAINS ABRUFEN
+        // 8. DOMAINS ABRUFEN
         // ============================================================
         async function fetchDomains() {
             try {
-                const data = await callApi('action=getDomainList');
-                if (data && data.length > 0) {
-                    state.domains = data;
-                }
+                const res = await fetch(`${API_BASE}/domains`);
+                if (!res.ok) throw new Error('Network error');
+                const data = await res.json();
+                state.domains = data['hydra:member']?.map(d => d.domain) || DOMAINS;
             } catch (err) {
-                // Fallback-Domains bleiben
+                state.domains = DOMAINS;
             } finally {
                 const select = document.getElementById('customDomainSelect');
                 if (select) {
@@ -474,7 +504,7 @@
         }
 
         // ============================================================
-        // 10. COPY & QR
+        // 9. COPY & QR
         // ============================================================
         async function copyEmail() {
             if (!state.address) return;
@@ -539,65 +569,76 @@
                 showToast('❌ Bitte Name und Domain eingeben', 'error');
                 return;
             }
-            await setupAccount(`${username}@${domain}`);
-            closeCustomModal();
-            showToast('✅ Wunschadresse erstellt!');
+            const address = `${username}@${domain}`;
+            const password = Math.random().toString(36).slice(-12) + 'A1!';
+            const success = await createAndAuthenticateAccount(address, password);
+            if (success) {
+                closeCustomModal();
+                showToast('✅ Wunschadresse erstellt!');
+            } else {
+                showToast('❌ Fehler beim Erstellen', 'error');
+            }
         }
 
         // ============================================================
-        // 11. NACHRICHTEN ABRUFEN
+        // 10. NACHRICHTEN ABRUFEN
         // ============================================================
         async function fetchMessages() {
-            if (!state.address) return;
+            if (!state.token || !state.address) {
+                console.warn('[fetchMessages] Kein Token oder Adresse');
+                return;
+            }
 
             const spinner = document.getElementById('refreshSpinner');
             if (spinner) spinner.classList.add('animate-spin');
 
             try {
-                const [login, domain] = state.address.split('@');
-                if (!login || !domain) return;
+                const oldCount = state.messages.length;
+                const res = await fetch(`${API_BASE}/messages`, {
+                    headers: { 'Authorization': `Bearer ${state.token}` }
+                });
 
-                console.log('[FETCH] login:', login, 'domain:', domain);
-                const data = await callApi(`action=getMessages&login=${login}&domain=${domain}`);
-
-                if (data && Array.isArray(data)) {
-                    const oldCount = state.messages.length;
-                    const mapped = data.map(msg => ({
-                        id: msg.id,
-                        from: msg.from || 'Unbekannt',
-                        subject: msg.subject || '(Kein Betreff)',
-                        date: msg.date || new Date().toISOString().replace('T', ' ').substring(0, 19),
-                        intro: msg.subject || '',
-                        seen: false
-                    }));
-
-                    // Seen-Status erhalten
-                    const seenMap = {};
-                    state.messages.forEach(m => { if (m.id) seenMap[m.id] = m.seen; });
-                    mapped.forEach(m => { if (seenMap[m.id] !== undefined) m.seen = seenMap[m.id]; });
-
-                    state.messages = mapped;
-
-                    if (mapped.length > oldCount) {
-                        playNotificationSound();
-                        showToast(`📩 ${mapped.length - oldCount} neue Nachricht(en)`);
-                    }
-
-                    renderMessagesList();
-                    console.log('[FETCH] OK:', mapped.length);
-                } else {
-                    state.messages = [];
-                    renderMessagesList();
+                if (res.status === 401) {
+                    // Token abgelaufen – neue Adresse generieren
+                    await generateNewEmail();
+                    return;
                 }
+
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                const newMessages = data['hydra:member'] || [];
+
+                // Bestehende Nachrichten mit seen-Status behalten
+                const seenMap = {};
+                state.messages.forEach(m => { if (m.id) seenMap[m.id] = m.seen; });
+                const mapped = newMessages.map(msg => ({
+                    ...msg,
+                    intro: msg.subject || '',
+                    seen: seenMap[msg.id] || false
+                }));
+
+                state.messages = mapped;
+                state.isLive = true;
+                updateStatusBadge();
+
+                if (mapped.length > oldCount) {
+                    playNotificationSound();
+                    showToast(`📩 ${mapped.length - oldCount} neue Nachricht(en)`);
+                }
+
+                renderMessagesList();
+                console.log('[FETCH] OK:', mapped.length);
             } catch (err) {
                 console.error('[FETCH] Fehler:', err);
+                state.isLive = false;
+                updateStatusBadge();
             } finally {
                 if (spinner) spinner.classList.remove('animate-spin');
             }
         }
 
         // ============================================================
-        // 12. NACHRICHT ÖFFNEN
+        // 11. NACHRICHT ÖFFNEN
         // ============================================================
         async function openMessage(id) {
             state.currentMessageId = id;
@@ -627,11 +668,11 @@
                         };
                     }
                 } else {
-                    const [login, domain] = state.address.split('@');
-                    const data = await callApi(`action=readMessage&login=${login}&domain=${domain}&id=${id}`);
-                    if (data && data.id) {
-                        msgData = data;
-                    }
+                    const res = await fetch(`${API_BASE}/messages/${id}`, {
+                        headers: { 'Authorization': `Bearer ${state.token}` }
+                    });
+                    if (!res.ok) throw new Error('Load failed');
+                    msgData = await res.json();
                 }
 
                 if (!msgData) throw new Error('Keine Daten');
@@ -641,10 +682,11 @@
                 if (target) target.seen = true;
                 renderMessagesList();
 
-                window.currentText = `Von: ${msgData.from}\nDatum: ${msgData.date}\nBetreff: ${msgData.subject}\n\n${msgData.textBody || ''}`;
+                window.currentText = `Von: ${msgData.from.address}\nDatum: ${msgData.createdAt}\nBetreff: ${msgData.subject}\n\n${msgData.text || ''}`;
 
-                const initial = (msgData.from || '?').charAt(0).toUpperCase();
-                const dateStr = msgData.date ? msgData.date.replace('T', ' ').substring(0, 19) : 'Unbekannt';
+                const fromName = msgData.from?.name || msgData.from?.address || 'Unbekannt';
+                const initial = fromName.charAt(0).toUpperCase();
+                const dateStr = msgData.createdAt ? new Date(msgData.createdAt).toLocaleString() : 'Unbekannt';
 
                 detailEl.innerHTML = `
                     <div class="p-6 border-b border-slate-100 dark:border-slate-800">
@@ -657,15 +699,15 @@
                         <div class="flex items-center gap-3">
                             <div class="w-12 h-12 rounded-full bg-m3-primaryContainer dark:bg-m3-darkPrimaryContainer flex items-center justify-center text-m3-onPrimaryContainer font-bold text-lg">${initial}</div>
                             <div class="text-sm">
-                                <div class="font-medium text-slate-900 dark:text-white">${msgData.from || 'Unbekannt'}</div>
+                                <div class="font-medium text-slate-900 dark:text-white">${fromName}</div>
                                 <div class="text-slate-500 text-xs mt-0.5">An: ${state.address} • ${dateStr}</div>
                             </div>
                         </div>
                     </div>
                     <div class="p-6 flex-1 overflow-y-auto bg-slate-50/50 dark:bg-black/10">
-                        ${msgData.htmlBody ?
-                            `<iframe class="w-full h-full min-h-[400px] bg-white rounded-xl border border-slate-200 dark:border-transparent" srcdoc="${escapeHtmlAttr(msgData.htmlBody)}"></iframe>` :
-                            `<div class="whitespace-pre-wrap font-sans text-sm text-slate-800 dark:text-slate-200">${escapeHtml(msgData.textBody || '')}</div>`
+                        ${msgData.html ? 
+                            `<iframe class="w-full h-full min-h-[400px] bg-white rounded-xl border border-slate-200 dark:border-transparent" srcdoc="${escapeHtmlAttr(msgData.html)}"></iframe>` :
+                            `<div class="whitespace-pre-wrap font-sans text-sm text-slate-800 dark:text-slate-200">${escapeHtml(msgData.text || '')}</div>`
                         }
                     </div>
                 `;
@@ -689,7 +731,7 @@
         }
 
         // ============================================================
-        // 13. RENDER MESSAGES
+        // 12. RENDER MESSAGES
         // ============================================================
         function renderMessagesList() {
             const listEl = document.getElementById('messagesList');
@@ -710,19 +752,20 @@
             listEl.innerHTML = state.messages.map(msg => {
                 let time = '';
                 try {
-                    time = new Date(msg.date.replace(' ', 'T')).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    time = new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                 } catch (e) {}
 
                 const isSelected = msg.id === state.currentMessageId;
                 const isUnread = !msg.seen;
-                const initial = (msg.from || '?').charAt(0).toUpperCase();
+                const fromName = msg.from?.name || msg.from?.address || 'Unbekannt';
+                const initial = fromName.charAt(0).toUpperCase();
 
                 return `
                     <div onclick="openMessage('${msg.id}')" class="group px-4 py-3 mx-2 my-1 rounded-2xl cursor-pointer transition-colors ${isSelected ? 'bg-m3-primaryContainer dark:bg-m3-darkPrimaryContainer' : 'hover:bg-slate-50 dark:hover:bg-white/5'} flex items-start gap-3">
                         <div class="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center font-bold text-white ${isUnread ? 'bg-m3-primary dark:bg-m3-darkPrimary' : 'bg-slate-300 dark:bg-slate-700'}">${initial}</div>
                         <div class="flex-1 min-w-0 pt-0.5">
                             <div class="flex items-center justify-between gap-2">
-                                <span class="font-medium text-sm truncate ${isUnread ? 'text-slate-900 dark:text-white' : 'text-slate-700 dark:text-slate-300'}">${msg.from || 'Unbekannt'}</span>
+                                <span class="font-medium text-sm truncate ${isUnread ? 'text-slate-900 dark:text-white' : 'text-slate-700 dark:text-slate-300'}">${fromName}</span>
                                 <span class="text-xs text-slate-500 flex-shrink-0">${time}</span>
                             </div>
                             <h4 class="text-sm font-medium truncate ${isUnread ? 'text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-400'}">${msg.subject || '(Kein Betreff)'}</h4>
@@ -734,7 +777,7 @@
         }
 
         // ============================================================
-        // 14. HELPER
+        // 13. HELPER
         // ============================================================
         function escapeHtml(text) {
             if (!text) return '';
@@ -747,7 +790,7 @@
         }
 
         // ============================================================
-        // 15. AUTO-UPDATE
+        // 14. AUTO-UPDATE
         // ============================================================
         setInterval(() => {
             state.countdown--;
@@ -760,13 +803,18 @@
         }, 1000);
 
         // ============================================================
-        // 16. INIT
+        // 15. INIT
         // ============================================================
         window.onload = async function() {
             initTheme();
             await fetchDomains();
 
-            if (state.address) {
+            // Lade gespeicherte History-Credentials
+            if (localStorage.getItem('pm_history_accounts')) {
+                state.history_accounts = JSON.parse(localStorage.getItem('pm_history_accounts'));
+            }
+
+            if (state.token && state.address) {
                 updateUI();
                 await fetchMessages();
             } else {
