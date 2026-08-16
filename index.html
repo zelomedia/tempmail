@@ -1,7 +1,6 @@
 ﻿<!DOCTYPE html>
 <html lang="de" class="h-full">
 <head>
-<meta name="google-site-verification" content="xPz8LYbyW7apgh5ICkhTjyJCHjIUhvJFnomwjQMr7Jw" />
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ProxyMail – Temporäre E-Mails</title>
@@ -853,6 +852,18 @@
                 display.textContent = state.address;
             }
             renderHistorySelect();
+            
+            const badge = document.getElementById('apiStatusBadge');
+            if (badge) {
+                badge.classList.remove('hidden', 'bg-green-100', 'text-green-700', 'bg-red-100', 'text-red-700', 'dark:bg-green-900', 'dark:text-green-300', 'dark:bg-red-900', 'dark:text-red-300');
+                if (state.isMockMode) {
+                    badge.textContent = 'Demo-Modus (Kein Empfang)';
+                    badge.classList.add('bg-red-100', 'text-red-700', 'dark:bg-red-900', 'dark:text-red-300');
+                } else {
+                    badge.textContent = 'Live';
+                    badge.classList.add('bg-green-100', 'text-green-700', 'dark:bg-green-900', 'dark:text-green-300');
+                }
+            }
         }
 
         function escapeHtml(text) {
